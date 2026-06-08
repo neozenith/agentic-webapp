@@ -1,0 +1,14 @@
+{
+  "name": "agentic-webapp-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Playwright end-to-end evidence suite — drives the deployed React app and proves the chat agent works and that its usage is accounted into BigQuery.",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
