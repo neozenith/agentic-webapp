@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from .api.routes import agent, assets, health
+from .api.routes import admin, agent, assets, health
 from .config import get_settings
 from .logging_setup import configure_logging
 
@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(assets.router)
+    app.include_router(admin.router)
 
     @app.get("/", response_class=HTMLResponse)
     async def root(request: Request) -> str:

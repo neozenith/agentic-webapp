@@ -16,6 +16,7 @@ from agentic_core.database import (
     BigQueryDatabaseManager,
     DatabaseManager,
     InMemoryDatabaseManager,
+    LlmUsageManager,
 )
 from ..services import AssetService
 from agentic_core.storage import GCSStorageManager, InMemoryStorageManager, StorageManager
@@ -48,6 +49,11 @@ def get_database() -> DatabaseManager:
 @lru_cache
 def get_asset_metadata_manager() -> AssetMetadataManager:
     return AssetMetadataManager(get_database(), table=get_settings().asset_metadata_table)
+
+
+@lru_cache
+def get_llm_usage_manager() -> LlmUsageManager:
+    return LlmUsageManager(get_database(), table=get_settings().llm_usage_table)
 
 
 @lru_cache

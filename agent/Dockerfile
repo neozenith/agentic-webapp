@@ -12,6 +12,8 @@ WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Shared lib at ../libs/core (matches the editable path dep), then deps, then code.
+COPY libs/core /libs/core
 COPY agent/pyproject.toml agent/uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY agent/agents ./agents

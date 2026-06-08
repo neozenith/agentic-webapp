@@ -131,6 +131,19 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "AGENT_MODEL"
         value = var.agent_model
       }
+      # Bookkeeping target (LlmUsageManager writes here via agentic-core).
+      env {
+        name  = "GCP_PROJECT"
+        value = local.project_id
+      }
+      env {
+        name  = "BIGQUERY_DATASET"
+        value = google_bigquery_dataset.app.dataset_id
+      }
+      env {
+        name  = "LLM_USAGE_TABLE"
+        value = google_bigquery_table.llm_usage.table_id
+      }
 
       resources {
         cpu_idle = true

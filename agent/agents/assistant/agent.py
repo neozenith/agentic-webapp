@@ -10,6 +10,8 @@ import os
 
 from google.adk.agents import Agent
 
+from .bookkeeping import record_usage
+
 MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash-lite")
 
 root_agent = Agent(
@@ -17,4 +19,6 @@ root_agent = Agent(
     model=MODEL,
     description="General-purpose assistant for agentic-webapp.",
     instruction="You are a helpful, concise assistant.",
+    # Itemise token usage + cost to the bookkeeping table after every model call.
+    after_model_callback=record_usage,
 )
