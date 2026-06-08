@@ -7,7 +7,8 @@ In container:  uvicorn agentic_webapp.main:app --host 0.0.0.0 --port $PORT
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from .api.routes import admin, agent, assets, health
 from .config import get_settings
@@ -44,37 +45,45 @@ def create_app() -> FastAPI:
         summary="Async FastAPI backend with pluggable storage + database abstractions.",
         lifespan=lifespan,
     )
+    # Backend APIs.
     app.include_router(health.router)
     app.include_router(assets.router)
     app.include_router(admin.router)
+    # Scoped proxy to the agent sidecar (ADK run endpoints + /dev-ui), registered
+    # before the SPA so those paths reach the agent, not the SPA fallback.
+    app.include_router(agent.build_router())
 
-    @app.get("/", response_class=HTMLResponse)
-    async def root(request: Request) -> str:
-        user = _iap_user(request) or "(local — no IAP in front)"
-        return f"""<!doctype html><html><head><meta charset=utf-8>
-<title>agentic-webapp</title>
-<style>body{{font-family:system-ui,sans-serif;background:#0b1120;color:#e2e8f0;
-display:grid;place-items:center;min-height:100vh;margin:0}}
-.card{{background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:2.5rem 3rem;max-width:34rem}}
-a{{color:#7dd3fc}} .k{{color:#94a3b8}} .v{{color:#5eead4}}</style></head>
-<body><div class=card>
-<h1>🛡️ agentic-webapp</h1>
-<p>Async FastAPI backend — storage + database abstractions over GCS &amp; BigQuery.</p>
-<p><span class=k>signed in as</span> <span class=v>{user}</span></p>
-<p><span class=k>environment</span> <span class=v>{settings.environment}</span> ·
-<span class=k>storage</span> <span class=v>{settings.storage_backend}</span> ·
-<span class=k>database</span> <span class=v>{settings.database_backend}</span></p>
-<p><a href="/docs">/docs</a> · <a href="/health">/health</a> · <a href="/api/assets">/api/assets</a></p>
-</div></body></html>"""
+    @app.get("/api/me")
+    async def me(request: Request) -> dict:
+        """Identity the SPA shows — from IAP in prod (ADR-0004), null when no IAP."""
+        return {"user": _iap_user(request), "environment": settings.environment}
 
-    # Catch-all LAST: any path the backend doesn't own is proxied to the agent
-    # sidecar (ADK debug UI /dev-ui/, /run_sse, /list-apps, /apps/...). Backend
-    # routes above (/, /health, /api/assets, /docs) take precedence.
-    @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-    async def agent_proxy(full_path: str, request: Request) -> StreamingResponse:
-        return await agent.proxy_to_agent(request, full_path)
-
+    _mount_frontend(app, settings)
     return app
+
+
+def _mount_frontend(app: FastAPI, settings) -> None:  # noqa: ANN001
+    """Serve the built React SPA (static assets + client-side-routing fallback) when
+    present; otherwise a minimal status page. Registered last so API + agent routes win."""
+    dist = settings.frontend_dist
+    index = dist / "index.html"
+
+    if not index.exists():
+        @app.get("/", response_class=HTMLResponse)
+        async def status_page() -> str:
+            return (
+                "<!doctype html><meta charset=utf-8><title>agentic-webapp</title>"
+                "<body style='font-family:system-ui;background:#0b1120;color:#e2e8f0'>"
+                f"<h1>agentic-webapp ({settings.environment})</h1>"
+                "<p>SPA not built. API at <a style=color:#7dd3fc href=/docs>/docs</a>.</p>"
+            )
+        return
+
+    app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", response_class=FileResponse)
+    async def spa(full_path: str) -> FileResponse:  # noqa: ARG001 — SPA client-side routing
+        return FileResponse(index)
 
 
 app = create_app()

@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     # Run (single service) it's localhost; in docker-compose it's the service name.
     agent_base_url: str = "http://localhost:8081"
 
+    # Built React SPA dir (copied into the image at /app/frontend_dist). Absent on a
+    # local backend-only run → SPA disabled, a status page is served at /.
+    frontend_dist: Path = Path("frontend_dist")
+
     log_level: str = "INFO"
     port: int = 8080
 

@@ -1,24 +1,24 @@
-"""Transparent reverse-proxy to the ADK agent sidecar.
+"""Reverse-proxy the ADK agent sidecar for a SCOPED set of paths (the agent's run
+endpoints + debug UI). Scoped, not catch-all, so the React SPA owns everything else.
 
-In cloud the agent listens on localhost only (single Cloud Run ingress), so the
-backend forwards any path it doesn't own to the sidecar — including the ADK debug
-UI (/dev-ui/...) and run endpoints (/run_sse, /list-apps, /apps/...). This makes the
-agent reachable through the one public URL, and both containers scale to zero
-together. Responses stream so SSE passes through live; the IAP user header flows
-through for the agent's bookkeeping (PR3).
-
-Registered as a catch-all in main.create_app() AFTER the backend's own routes, so
-those take precedence.
+In cloud the agent listens on localhost only (single ingress); the backend forwards
+these paths to it, streaming responses so SSE passes through. The IAP user header
+flows through for the agent's bookkeeping.
 """
 
 import httpx
-from fastapi import Request
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
 from ...config import get_settings
 
 _HOP = {"host", "content-length", "connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade"}
+
+# ADK paths owned by the agent. Everything else is the SPA / backend API.
+_FIXED = ["/run", "/run_sse", "/list-apps", "/dev-ui"]
+_WILD = ["/apps/{path:path}", "/dev-ui/{path:path}", "/debug/{path:path}", "/builder/{path:path}"]
+_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
 
 
 async def _aclose(response: httpx.Response, client: httpx.AsyncClient) -> None:
@@ -44,3 +44,19 @@ async def proxy_to_agent(request: Request, path: str) -> StreamingResponse:
         headers={k: v for k, v in response.headers.items() if k.lower() not in _HOP},
         background=BackgroundTask(_aclose, response, client),
     )
+
+
+def build_router() -> APIRouter:
+    router = APIRouter(tags=["agent"])
+
+    async def fixed(request: Request) -> StreamingResponse:
+        return await proxy_to_agent(request, request.url.path.lstrip("/"))
+
+    async def wild(request: Request, path: str) -> StreamingResponse:  # noqa: ARG001 — path satisfies the route
+        return await proxy_to_agent(request, request.url.path.lstrip("/"))
+
+    for p in _FIXED:
+        router.add_api_route(p, fixed, methods=_METHODS)
+    for p in _WILD:
+        router.add_api_route(p, wild, methods=_METHODS)
+    return router
