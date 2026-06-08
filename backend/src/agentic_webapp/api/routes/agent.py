@@ -14,6 +14,11 @@ from starlette.background import BackgroundTask
 from ...config import get_settings
 
 _HOP = {"host", "content-length", "connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade"}
+# The agent sidecar is reachable ONLY through this same-process proxy on localhost,
+# so the backend — not the agent — is the trust boundary. The browser's Origin/Referer
+# point at the public site, which ADK's CSRF/origin guard rejects ("Forbidden: origin
+# not allowed"). Drop them so the localhost hop is treated as same-origin.
+_DROP = _HOP | {"origin", "referer"}
 
 # ADK paths owned by the agent. Everything else is the SPA / backend API.
 _FIXED = ["/run", "/run_sse", "/list-apps", "/dev-ui"]
@@ -26,10 +31,16 @@ async def _aclose(response: httpx.Response, client: httpx.AsyncClient) -> None:
     await client.aclose()
 
 
+def forward_headers(incoming: dict[str, str]) -> dict[str, str]:
+    """Headers to forward to the localhost sidecar: drop hop-by-hop headers plus the
+    browser Origin/Referer (which ADK's origin guard would reject — see _DROP)."""
+    return {k: v for k, v in incoming.items() if k.lower() not in _DROP}
+
+
 async def proxy_to_agent(request: Request, path: str) -> StreamingResponse:
     target = f"{get_settings().agent_base_url}/{path}"
     client = httpx.AsyncClient(timeout=None)
-    headers = {k: v for k, v in request.headers.items() if k.lower() not in _HOP}
+    headers = forward_headers(dict(request.headers))
     upstream = client.build_request(
         request.method,
         target,
