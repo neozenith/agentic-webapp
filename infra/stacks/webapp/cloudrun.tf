@@ -139,6 +139,18 @@ resource "google_cloud_run_v2_service" "app" {
           memory = "1Gi"
         }
       }
+
+      # Required because the backend container depends_on this one: Cloud Run needs a
+      # startup probe to know the agent is ready before starting the backend. adk web
+      # can take a while to import, so allow a generous window.
+      startup_probe {
+        tcp_socket {
+          port = 8081
+        }
+        period_seconds    = 5
+        timeout_seconds   = 3
+        failure_threshold = 30
+      }
     }
   }
 
