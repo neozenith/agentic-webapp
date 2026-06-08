@@ -33,6 +33,14 @@ inputs:
     description: Full image ref (repo:tag) to build/push when build_context is set. Also pass it to terraform via TF_VAR_container_image at the job level.
     required: false
     default: ''
+  agent_build_context:
+    description: If set, also build/push the agent sidecar image from this dir's cloudbuild.yaml.
+    required: false
+    default: ''
+  agent_build_image:
+    description: Full image ref (repo:tag) for the agent image when agent_build_context is set. Pass to terraform via TF_VAR_agent_image at the job level.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -62,6 +70,15 @@ runs:
           --project "dbt-${{ inputs.env }}-jaffleshop" \
           --config "${{ inputs.build_context }}/cloudbuild.yaml" \
           --substitutions=_IMAGE="${{ inputs.build_image }}"
+
+    - if: inputs.agent_build_context != ''
+      name: Build & push agent image (${{ inputs.agent_build_image }})
+      shell: bash
+      run: |
+        gcloud builds submit . \
+          --project "dbt-${{ inputs.env }}-jaffleshop" \
+          --config "${{ inputs.agent_build_context }}/cloudbuild.yaml" \
+          --substitutions=_IMAGE="${{ inputs.agent_build_image }}"
 
     - shell: bash
       run: terraform -chdir=infra/stacks/${{ inputs.stack }} init -backend-config=./backends/${{ inputs.env }}.config -reconfigure

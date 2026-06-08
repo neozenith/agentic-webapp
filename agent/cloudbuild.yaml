@@ -1,0 +1,10 @@
+# Build the agent image from the REPO ROOT context (consistent with backend; PR3
+# will add libs/core for bookkeeping). Invoked by the terraform composite action:
+#   gcloud builds submit . --config agent/cloudbuild.yaml --substitutions=_IMAGE=<ref>
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "agent/Dockerfile", "-t", "${_IMAGE}", "."]
+images:
+  - "${_IMAGE}"
+options:
+  logging: CLOUD_LOGGING_ONLY

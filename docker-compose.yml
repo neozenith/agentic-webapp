@@ -1,0 +1,45 @@
+# Local two-container run integrated against the DEV cloud services (GCS + BigQuery
+# + Vertex), using YOUR Application Default Credentials (mounted read-only). Ports
+# bind to 0.0.0.0 so you can reach them from another device on the same wifi:
+#   backend:    http://<laptop-lan-ip>:8080
+#   agent UI:   http://<laptop-lan-ip>:8081/dev-ui/
+#
+#   gcloud auth application-default login   # once
+#   docker compose up --build
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      GOOGLE_GENAI_USE_VERTEXAI: "True"
+      GOOGLE_CLOUD_PROJECT: dbt-dev-jaffleshop
+      GOOGLE_CLOUD_LOCATION: us-central1
+      AGENT_MODEL: gemini-2.5-flash-lite
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/adc.json
+    volumes:
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/gcp/adc.json:ro
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ENVIRONMENT: local-cloud
+      # Integrate against the real dev cloud services.
+      STORAGE_BACKEND: gcs
+      DATABASE_BACKEND: bigquery
+      GCP_PROJECT: dbt-dev-jaffleshop
+      ASSETS_BUCKET: dbt-dev-jaffleshop-agentic-webapp-assets
+      BIGQUERY_DATASET: agentic_webapp
+      # Reach the agent sidecar by compose service name.
+      AGENT_BASE_URL: http://agent:8081
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/adc.json
+    volumes:
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/gcp/adc.json:ro
+    depends_on:
+      - agent

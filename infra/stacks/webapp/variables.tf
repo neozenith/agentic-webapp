@@ -26,6 +26,24 @@ variable "repository_id" {
   default     = "agentic-webapp"
 }
 
+variable "agent_image" {
+  description = "Container image for the ADK agent sidecar. Built by CI; defaults to the hello sample so plans work pre-build."
+  type        = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+}
+
+variable "agent_model" {
+  description = "Gemini model the agent uses by default (cheapest by default)."
+  type        = string
+  default     = "gemini-2.5-flash-lite"
+}
+
+variable "vertex_location" {
+  description = "Vertex AI model-serving region (independent of the app's GCS/BQ region)."
+  type        = string
+  default     = "us-central1"
+}
+
 variable "container_image" {
   description = <<-EOT
     Container image to deploy. Defaults to Google's hello sample so the stack is

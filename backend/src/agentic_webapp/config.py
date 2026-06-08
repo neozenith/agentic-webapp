@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # set it to simulate users — see ADR-0004. Set false to ignore client identity.
     trust_forwarded_user: bool = True
 
+    # Base URL of the ADK agent sidecar the backend reverse-proxies to. In Cloud
+    # Run (single service) it's localhost; in docker-compose it's the service name.
+    agent_base_url: str = "http://localhost:8081"
+
     log_level: str = "INFO"
     port: int = 8080
 
