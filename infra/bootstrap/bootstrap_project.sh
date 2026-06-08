@@ -122,11 +122,23 @@ fi
 # identities needs wide rights. Narrow later once the resource set is stable.
 # Blast radius is still bounded by the dual WIF gate (repo claim + SA binding).
 log "Granting roles/owner to deployer SA"
-gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-  --member="serviceAccount:${TF_SA_EMAIL}" \
-  --role="roles/owner" \
-  --condition=None \
-  --quiet >/dev/null
+# SA creation is eventually consistent: a freshly-created SA can be invisible to
+# the IAM policy API for a few seconds, so the grant may 400 with "does not
+# exist". Retry briefly before giving up.
+binding_ok=""
+for attempt in 1 2 3 4 5 6; do
+  if gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+      --member="serviceAccount:${TF_SA_EMAIL}" \
+      --role="roles/owner" \
+      --condition=None \
+      --quiet >/dev/null 2>&1; then
+    binding_ok="yes"
+    break
+  fi
+  sub "deployer SA not yet visible to IAM, retrying (${attempt})…"
+  sleep 5
+done
+[ -n "${binding_ok}" ] || { echo "ERROR: failed to grant roles/owner to ${TF_SA_EMAIL}" >&2; exit 1; }
 sub "binding ensured"
 
 # 5. Workload Identity Pool ------------------------------------------------

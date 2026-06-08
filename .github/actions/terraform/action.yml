@@ -25,6 +25,14 @@ inputs:
     description: Terraform CLI version to install.
     required: false
     default: '1.10.0'
+  build_context:
+    description: If set, `gcloud builds submit` this dir and push build_image before terraform (app image build).
+    required: false
+    default: ''
+  build_image:
+    description: Full image ref (repo:tag) to build/push when build_context is set. Also pass it to terraform via TF_VAR_container_image at the job level.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -38,6 +46,16 @@ runs:
     - uses: hashicorp/setup-terraform@v4
       with:
         terraform_version: ${{ inputs.terraform_version }}
+
+    # Build + push the application image into the env's Artifact Registry, so the
+    # apply deploys real code (terraform reads the tag via TF_VAR_container_image).
+    - if: inputs.build_context != ''
+      uses: google-github-actions/setup-gcloud@v3
+
+    - if: inputs.build_context != ''
+      name: Build & push image (${{ inputs.build_image }})
+      shell: bash
+      run: gcloud builds submit "${{ inputs.build_context }}" --tag "${{ inputs.build_image }}" --project "dbt-${{ inputs.env }}-jaffleshop"
 
     - shell: bash
       run: terraform -chdir=infra/stacks/${{ inputs.stack }} init -backend-config=./backends/${{ inputs.env }}.config -reconfigure

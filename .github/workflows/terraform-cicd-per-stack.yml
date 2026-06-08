@@ -31,6 +31,21 @@ on:
         description: Stack name under infra/stacks/.
         required: true
         type: string
+      build_context:
+        description: App build dir for `gcloud builds submit` (empty = no app image build).
+        required: false
+        type: string
+        default: ''
+      image_name:
+        description: Artifact Registry repo + image name (empty = no app image; stack uses its terraform default).
+        required: false
+        type: string
+        default: ''
+      region:
+        description: Region hosting Artifact Registry / Cloud Run.
+        required: false
+        type: string
+        default: australia-southeast1
 
 permissions:
   contents: read
@@ -69,6 +84,15 @@ jobs:
       fail-fast: false
       matrix:
         env: [dev, test, prod]
+    env:
+      # Plan against the image this commit WOULD deploy (built at apply time), so
+      # the plan reflects the code change. Falls back to the stack's default image
+      # for stacks that don't build one.
+      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-{1}-jaffleshop/{2}/{2}:{3}', inputs.region, matrix.env, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # IAP custom OAuth client (prod env secrets; empty for dev/test). Keeps the
+      # prod plan from showing google_iap_settings as removed.
+      TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
+      TF_VAR_iap_oauth_client_secret: ${{ secrets.IAP_OAUTH_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/terraform
@@ -89,6 +113,8 @@ jobs:
     environment: dev
     env:
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
+      # So the delta diagram reflects this commit's image (dev), not the default.
+      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-dev-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
     steps:
       - uses: actions/checkout@v6
       - name: Install graphviz (required by mingrammer diagrams)
@@ -153,6 +179,8 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     environment: dev
+    env:
+      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-dev-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/terraform
@@ -162,6 +190,8 @@ jobs:
           action: apply
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.TF_SA }}
+          build_context: ${{ inputs.build_context }}
+          build_image: ${{ env.TF_VAR_container_image }}
 
   # Merge / push to main — apply test.
   apply-test:
@@ -170,6 +200,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: test
+    env:
+      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-test-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/terraform
@@ -179,6 +211,8 @@ jobs:
           action: apply
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.TF_SA }}
+          build_context: ${{ inputs.build_context }}
+          build_image: ${{ env.TF_VAR_container_image }}
 
   # Tag (v*) or manual dispatch — apply prod. Add required reviewers to the
   # "prod" GitHub Environment to gate this behind a human approval.
@@ -190,6 +224,11 @@ jobs:
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: prod
+    env:
+      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-prod-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # Prod is IAP-gated and needs its custom OAuth client (no-org requirement).
+      TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
+      TF_VAR_iap_oauth_client_secret: ${{ secrets.IAP_OAUTH_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/terraform
@@ -199,3 +238,5 @@ jobs:
           action: apply
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.TF_SA }}
+          build_context: ${{ inputs.build_context }}
+          build_image: ${{ env.TF_VAR_container_image }}
