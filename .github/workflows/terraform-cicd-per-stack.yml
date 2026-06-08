@@ -63,6 +63,9 @@ jobs:
         with:
           terraform_version: '1.10.0'
       - uses: aquasecurity/setup-trivy@v0.2.6
+        with:
+          version: v0.71.0   # pin: avoids the rate-limited unauthenticated 'latest' GitHub API lookup
+          cache: true
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
