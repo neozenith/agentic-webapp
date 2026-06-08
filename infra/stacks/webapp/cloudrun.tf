@@ -36,7 +36,10 @@ resource "google_cloud_run_v2_service" "app" {
       max_instance_count = var.max_instances
     }
 
+    # --- Ingress container: FastAPI backend. Serves the SPA + APIs and proxies to
+    # the agent sidecar on localhost (single public ingress). ---
     containers {
+      name  = "backend"
       image = var.container_image
 
       # Surfaces the environment in the app UI/health payload (read as ENVIRONMENT
@@ -81,6 +84,11 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "TEMP_DIR"
         value = "tmp"
       }
+      # The agent sidecar listens on localhost:8081 in the same instance.
+      env {
+        name  = "AGENT_BASE_URL"
+        value = "http://localhost:8081"
+      }
 
       ports {
         container_port = var.container_port
@@ -95,10 +103,46 @@ resource "google_cloud_run_v2_service" "app" {
           memory = var.memory
         }
       }
+
+      # Boot the agent sidecar first so the proxy is ready on cold start.
+      depends_on = ["agent"]
+    }
+
+    # --- Sidecar container: the ADK agent (keyless Vertex via the shared runtime SA;
+    # Cloud Run uses ONE service account per service, so a dedicated agent SA needs
+    # the dual-service model). No ports block: localhost-only, reached via the proxy. ---
+    containers {
+      name  = "agent"
+      image = var.agent_image
+
+      env {
+        name  = "GOOGLE_GENAI_USE_VERTEXAI"
+        value = "True"
+      }
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = local.project_id
+      }
+      env {
+        name  = "GOOGLE_CLOUD_LOCATION"
+        value = var.vertex_location
+      }
+      env {
+        name  = "AGENT_MODEL"
+        value = var.agent_model
+      }
+
+      resources {
+        cpu_idle = true
+        limits = {
+          cpu    = "1"
+          memory = "1Gi"
+        }
+      }
     }
   }
 
-  depends_on = [google_project_service.run]
+  depends_on = [google_project_service.run, google_project_service.aiplatform]
 }
 
 # When IAP is off, allow unauthenticated invocation so the run.app URL is usable

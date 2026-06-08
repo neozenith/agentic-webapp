@@ -7,9 +7,9 @@ In container:  uvicorn agentic_webapp.main:app --host 0.0.0.0 --port $PORT
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
-from .api.routes import assets, health
+from .api.routes import agent, assets, health
 from .config import get_settings
 from .logging_setup import configure_logging
 
@@ -65,6 +65,13 @@ a{{color:#7dd3fc}} .k{{color:#94a3b8}} .v{{color:#5eead4}}</style></head>
 <span class=k>database</span> <span class=v>{settings.database_backend}</span></p>
 <p><a href="/docs">/docs</a> · <a href="/health">/health</a> · <a href="/api/assets">/api/assets</a></p>
 </div></body></html>"""
+
+    # Catch-all LAST: any path the backend doesn't own is proxied to the agent
+    # sidecar (ADK debug UI /dev-ui/, /run_sse, /list-apps, /apps/...). Backend
+    # routes above (/, /health, /api/assets, /docs) take precedence.
+    @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+    async def agent_proxy(full_path: str, request: Request) -> StreamingResponse:
+        return await agent.proxy_to_agent(request, full_path)
 
     return app
 

@@ -47,4 +47,6 @@ jobs:
       # The webapp stack ships an app image; CI builds backend/ and deploys it.
       build_context: backend
       image_name: agentic-webapp
+      # Also build the ADK agent sidecar image (agentic-webapp/agent).
+      agent_build_context: agent
     secrets: inherit

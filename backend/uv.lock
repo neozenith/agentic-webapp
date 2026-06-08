@@ -34,6 +34,7 @@ source = { editable = "." }
 dependencies = [
     { name = "agentic-core" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
@@ -50,6 +51,7 @@ dev = [
 requires-dist = [
     { name = "agentic-core", editable = "../libs/core" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "pydantic", specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.6.0" },
     { name = "python-multipart", specifier = ">=0.0.12" },
