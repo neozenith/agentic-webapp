@@ -111,6 +111,10 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     environment: dev
+    permissions:
+      contents: write        # push the PNG to the ci-diagrams branch (inline rendering)
+      id-token: write        # WIF auth for the terraform plan
+      pull-requests: write   # post the sticky comment
     env:
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
       # So the delta diagram reflects this commit's image (dev), not the default.
@@ -146,16 +150,48 @@ jobs:
           name: ${{ inputs.stack }}-dev-plan-diagram
           path: infra/diagrams/${{ inputs.stack }}-dev-plan.png
           if-no-files-found: error
+      # Publish the PNG to a dedicated orphan branch so the PR comment can embed it
+      # inline (raw.githubusercontent.com serves image bytes; an artifact zip can't).
+      - id: publish
+        name: Publish diagram to ci-diagrams branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          src="infra/diagrams/${{ inputs.stack }}-dev-plan.png"
+          dest="${{ inputs.stack }}/dev/pr-${PR}.png"
+          repo_url="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          work="${RUNNER_TEMP}/ci-diagrams"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git clone --depth 1 --branch ci-diagrams "$repo_url" "$work" 2>/dev/null; then
+            echo "reusing existing ci-diagrams branch"
+          else
+            echo "creating orphan ci-diagrams branch"
+            git clone --depth 1 "$repo_url" "$work"
+            git -C "$work" checkout --orphan ci-diagrams
+            git -C "$work" rm -rfq . || true
+          fi
+          mkdir -p "$work/$(dirname "$dest")"
+          cp "$src" "$work/$dest"
+          git -C "$work" add "$dest"
+          git -C "$work" commit -qm "ci(diagram): ${{ inputs.stack }} dev plan for PR #${PR} (${GITHUB_SHA})" || echo "no diagram change"
+          git -C "$work" push -q origin ci-diagrams
+          echo "raw_url=https://raw.githubusercontent.com/${{ github.repository }}/ci-diagrams/${dest}" >> "$GITHUB_OUTPUT"
       - name: Post / update sticky PR comment
         uses: actions/github-script@v9
         with:
           script: |
             const stack = "${{ inputs.stack }}";
             const url = "${{ steps.upload.outputs.artifact-url }}";
+            const img = "${{ steps.publish.outputs.raw_url }}?v=${{ github.sha }}";
             const marker = `<!-- tf-diagram:${stack} -->`;
             const body = [
               marker,
               `### 📊 \`${stack}\` — architecture plan delta (dev)`,
+              ``,
+              `![${stack} dev plan delta](${img})`,
               ``,
               `Rendered by \`tfs diagram ${stack} dev --mode plan\`. Nodes are coloured by plan`,
               `action (➕ create · ~ update · ± replace · 🗑️ delete).`,
