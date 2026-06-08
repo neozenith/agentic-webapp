@@ -173,7 +173,9 @@ def cmd_diagram(args: Namespace) -> None:
     _run_tf(infra_root, f"-chdir={chdir} init -backend-config=./backends/{args.env}.config -reconfigure", capture=True)
     _run_tf(
         infra_root,
-        f"-chdir={chdir} plan -input=false -no-color -out=tmp/diagram.tfplan -var environment={args.env} {var_file}",
+        # -lock=false: this plan is a throwaway, read-only snapshot for the diagram.
+        # Without it, it races the real plan/apply jobs for the GCS state lock.
+        f"-chdir={chdir} plan -input=false -no-color -lock=false -out=tmp/diagram.tfplan -var environment={args.env} {var_file}",
         capture=True,
     )
     doc = json.loads(_run_tf(infra_root, f"-chdir={chdir} show -json tmp/diagram.tfplan", capture=True))
