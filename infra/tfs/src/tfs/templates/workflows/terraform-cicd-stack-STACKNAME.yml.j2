@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write          # diagram job pushes the rendered PNG to the ci-diagrams branch
   id-token: write          # required by google-github-actions/auth (OIDC)
   pull-requests: write
 
