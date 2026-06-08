@@ -17,6 +17,11 @@ IAP_USER_HEADER = "x-goog-authenticated-user-email"
 
 
 def _iap_user(request: Request) -> str | None:
+    """The caller's identity from IAP. In prod IAP sets (and sanitizes) the header;
+    in non-prod a client may set it to simulate users when trust_forwarded_user is on
+    (ADR-0004). Disable trust to ignore client-supplied identity."""
+    if not get_settings().trust_forwarded_user:
+        return None
     raw = request.headers.get(IAP_USER_HEADER)
     if not raw:
         return None

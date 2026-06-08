@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     temp_dir: Path = Path("tmp")
     signed_url_ttl_seconds: int = 900
 
+    # Trust the X-Goog-Authenticated-User-Email header as the caller identity. IAP
+    # sets it (and strips client-supplied copies) in prod; in non-prod a client may
+    # set it to simulate users — see ADR-0004. Set false to ignore client identity.
+    trust_forwarded_user: bool = True
+
     log_level: str = "INFO"
     port: int = 8080
 

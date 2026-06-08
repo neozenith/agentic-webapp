@@ -4,18 +4,13 @@ locals {
   # named resources (see infra/README.md "Coexistence").
   project_id = "dbt-${var.environment}-jaffleshop"
 
-  # IAP policy per environment:
-  #   - dev  : OFF — public, IAP-free fast-iteration space (matches local containers).
-  #   - test : OFF — public testing space for now (may flip to true later; needs its
-  #            own OAuth consent screen in the test project when it does).
-  #   - prod : ON  — IAP-gated; its OAuth consent screen is configured manually.
-  # var.enable_iap (default null) overrides this for a single apply if ever needed.
-  iap_default_by_env = {
-    dev  = false
-    test = false
-    prod = true
-  }
-  iap_enabled = var.enable_iap != null ? var.enable_iap : local.iap_default_by_env[var.environment]
+  # IAP is enabled when a custom OAuth client is supplied — no-org projects require
+  # one (ADR-0002), so its presence IS the on/off switch. In CI the client comes
+  # from a per-environment GitHub secret (TF_VAR_iap_oauth_client_id); an env with
+  # no such secret runs public. dev is public by design (no sensitive data, ADR-0003);
+  # prod has the secret so IAP is on; test flips on the moment its secret is added.
+  # var.enable_iap (default null) can still force a value for a one-off apply.
+  iap_enabled = var.enable_iap != null ? var.enable_iap : (var.iap_oauth_client_id != "")
 }
 
 data "google_project" "this" {}

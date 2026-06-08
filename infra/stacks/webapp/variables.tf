@@ -63,13 +63,11 @@ variable "max_instances" {
 
 variable "enable_iap" {
   description = <<-EOT
-    Optional per-apply OVERRIDE for IAP protection. Leave null (the default) to use
-    the per-environment policy in main.tf (local.iap_default_by_env): dev/test are
-    a deliberately IAP-free, publicly reachable fast-iteration space; prod is
-    IAP-gated. Set true/false to force a specific value for one apply regardless of
-    environment. When IAP is on, only var.iap_members may reach the service AND the
-    project's OAuth consent screen must already exist (a manual Console step on
-    these no-org projects).
+    Optional per-apply OVERRIDE for IAP protection. Leave null (the default) and IAP
+    turns on automatically iff a custom OAuth client is supplied (var.iap_oauth_client_id
+    is non-empty) — see ADR-0002. So an environment is public until its OAuth client
+    secret is provided (in CI, a per-environment GitHub secret). Set true/false to
+    force a value for one apply regardless.
   EOT
   type        = bool
   default     = null
@@ -77,11 +75,13 @@ variable "enable_iap" {
 
 variable "iap_oauth_client_id" {
   description = <<-EOT
-    Custom OAuth 2.0 client ID for IAP. REQUIRED for IAP in projects with NO GCP
-    organization — IAP's default Google-managed client only works inside an org,
-    so without this IAP returns HTTP 502 "Empty OAuth client ID/secret". Created
-    manually in the Console (APIs & Services → Credentials → Create OAuth client ID
-    → Web application). Leave empty when IAP is off.
+    Custom OAuth 2.0 client ID for IAP. Its presence is the IAP on/off switch
+    (see var.enable_iap / ADR-0002): non-empty ⇒ IAP enabled, empty ⇒ public.
+    REQUIRED for IAP in projects with NO GCP organization — IAP's Google-managed
+    client only works inside an org, so without a custom client IAP returns HTTP
+    502 "Empty OAuth client ID/secret". Created manually in the Console (APIs &
+    Services → Credentials → Create OAuth client ID → Web application); in CI it is
+    supplied per-environment via a GitHub secret.
   EOT
   type        = string
   default     = ""

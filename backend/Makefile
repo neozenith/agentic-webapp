@@ -20,6 +20,15 @@ install: ## Sync the venv from uv.lock
 dev: ## Run locally with hot reload at http://localhost:$(PORT)  (in-memory backends)
 	uv run uvicorn agentic_webapp.main:app --reload --host 0.0.0.0 --port $(PORT)
 
+GCP_ENV ?= dev
+dev-cloud: ## Run locally AGAINST cloud services (GCS+BigQuery in the dev project; uses your ADC). See ADR-0005.
+	STORAGE_BACKEND=gcs DATABASE_BACKEND=bigquery \
+	GCP_PROJECT=dbt-$(GCP_ENV)-jaffleshop \
+	ASSETS_BUCKET=dbt-$(GCP_ENV)-jaffleshop-agentic-webapp-assets \
+	BIGQUERY_DATASET=agentic_webapp \
+	ENVIRONMENT=$(GCP_ENV) \
+	uv run uvicorn agentic_webapp.main:app --reload --host 0.0.0.0 --port $(PORT)
+
 start: ## Run locally without reload (production entrypoint)
 	uv run uvicorn agentic_webapp.main:app --host 0.0.0.0 --port $(PORT)
 
