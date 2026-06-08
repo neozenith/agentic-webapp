@@ -48,6 +48,30 @@ make -C backend dev          # http://localhost:8080  (reload)
   curl http://localhost:8080/api/assets/<id>/url                 # signed/proxy URL
   ```
 
+## Simulating users (ADR-0004)
+
+Identity comes from the IAP header `X-Goog-Authenticated-User-Email`. IAP sets it in
+prod (and strips client copies); locally there's no IAP, so you can set it yourself
+to simulate any user:
+
+```bash
+curl -H 'X-Goog-Authenticated-User-Email: accounts.google.com:alice@example.com' \
+     http://localhost:8080/
+```
+
+Set `TRUST_FORWARDED_USER=false` to ignore client-supplied identity.
+
+## Run locally against cloud services (ADR-0005)
+
+```bash
+gcloud auth application-default login      # once
+make -C backend dev-cloud                  # GCS + BigQuery in the dev project, via your ADC
+```
+
+Same handlers, real cloud backends — chosen purely by config. (Signed URLs locally
+need impersonation of the signer SA; otherwise use the `/api/assets/{id}/content`
+proxy. See ADR-0005.)
+
 ## Use the GCP backends
 
 Set in `.env` (or via Cloud Run env — the webapp Terraform stack wires these):

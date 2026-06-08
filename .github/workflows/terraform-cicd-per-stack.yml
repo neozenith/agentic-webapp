@@ -217,6 +217,10 @@ jobs:
     environment: dev
     env:
       TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-dev-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # IAP on iff these are set (per-env GitHub secret); empty ⇒ public. dev is
+      # public by design (ADR-0003), so these are normally absent.
+      TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
+      TF_VAR_iap_oauth_client_secret: ${{ secrets.IAP_OAUTH_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/terraform
@@ -238,6 +242,10 @@ jobs:
     environment: test
     env:
       TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-test-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # IAP on iff a test OAuth client secret is added to the test environment;
+      # empty ⇒ public (current default). No code change needed to flip it on.
+      TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
+      TF_VAR_iap_oauth_client_secret: ${{ secrets.IAP_OAUTH_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/terraform

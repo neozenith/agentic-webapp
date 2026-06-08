@@ -34,29 +34,28 @@ Both grants are required. The end user is admitted by IAP (`httpsResourceAccesso
 the request that reaches Cloud Run is made by the IAP service agent, which holds
 `run.invoker`. The container itself runs as a third identity (the runtime SA).
 
-## IAP policy (per environment)
+## IAP policy (presence-based — see ADR-0002)
 
-IAP is driven automatically by environment via `local.iap_default_by_env` in
-`main.tf` — no flag to remember per apply:
+IAP turns on **automatically when a custom OAuth client is supplied**
+(`var.iap_oauth_client_id` is non-empty). There is no per-environment flag to
+maintain — supplying the client *is* the switch:
 
-| Env | IAP | Why |
-|-----|-----|-----|
-| **dev** | ❌ off | Public, IAP-free fast-iteration space (mirrors local containers). |
-| **test** | ❌ off | Public testing space for now (may flip to true later). |
-| **prod** | ✅ on | IAP-gated; only `var.iap_members` may reach it. |
+| Env | OAuth client secret? | IAP | Why |
+|-----|----------------------|-----|-----|
+| **dev** | none | ❌ off | Public, IAP-free fast-iteration space; no sensitive data (ADR-0003). |
+| **test** | none (today) | ❌ off | Public for now — add a test OAuth client secret to flip it on, no code change. |
+| **prod** | yes (GitHub secret) | ✅ on | IAP-gated; only `var.iap_members` may reach it. |
 
-So `tfs apply webapp dev` is public and `tfs apply webapp prod` is IAP-gated,
-with no extra arguments. When IAP is off, the service gets `allUsers`
-`roles/run.invoker` so the `run.app` URL works in a browser; scale-to-zero is
-unchanged either way.
+In CI the client id/secret come from the matching **GitHub Environment secrets**
+(`IAP_OAUTH_CLIENT_ID` / `IAP_OAUTH_CLIENT_SECRET`); an environment with no such
+secret runs public. When IAP is off, the service gets `allUsers` `roles/run.invoker`
+so the `run.app` URL works in a browser; scale-to-zero is unchanged either way.
 
-**Override for a single apply:** `var.enable_iap` (default `null` = use the policy)
-forces a value, e.g. `terraform -chdir=stacks/webapp apply -var environment=dev
--var enable_iap=true`.
+**Flip any environment to IAP** = add its OAuth client (below) + set the two secrets
+on that GitHub Environment, then redeploy. No terraform edit.
 
-**Flipping test (or any env) to IAP later** is a two-step change:
-1. one-line edit: set its entry in `local.iap_default_by_env` to `true`;
-2. configure that project's OAuth consent screen (below) once.
+**Override for a single apply:** `var.enable_iap` (default `null` = presence-based)
+forces a value, e.g. `-var enable_iap=true`.
 
 ### ⚠️ No-org IAP prerequisites (per project, manual — two parts)
 
