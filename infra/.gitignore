@@ -1,0 +1,21 @@
+# Terraform working files — never commit these.
+**/.terraform/
+**/.terraform.tfstate.lock.info
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+
+# Local var overrides may contain secrets / personal values.
+*.tfvars
+!*.tfvars.example
+
+# Local state should never exist (GCS backend) — guard anyway.
+*.tfstate
+*.tfstate.*
+
+# Scratch space (see global CLAUDE.md tmp/ rule).
+tmp/
+
+# Generated architecture diagrams (regenerate with `tfs diagram` / `make diagram`).
+diagrams/

@@ -1,0 +1,28 @@
+# Per-environment GCP settings consumed by the `tfs` CLI (infra/tfs/) when it
+# scaffolds a NEW stack's backend configs (one stacks/<stack>/backends/<env>.config per env).
+#
+# This repo deliberately REUSES the same three GCP projects as the sibling
+# dbt-gcp-jaffleshop project, but is otherwise a fully SEPARATE, namespaced
+# project. NOTHING collides with the dbt resources:
+#   - state lives in this repo's OWN tfstate bucket per project
+#     (dbt-<env>-jaffleshop-agentic-webapp-tfstate) — NOT the dbt tfstate bucket.
+#   - within that bucket, per-stack isolation via prefix terraform/state/<stack>.
+#   - CI authenticates through a SEPARATE deployer SA + OIDC provider scoped to
+#     THIS repo (see bootstrap/config.sh), added alongside the dbt ones — never
+#     replacing them.
+#
+# State layout convention (uniform for EVERY stack):
+#   bucket = "<state_bucket>"                  # this repo's own tfstate bucket per project
+#   prefix = "terraform/state/<stack_name>"    # per-stack isolation within the bucket
+
+state_location: australia-southeast1
+environments:
+  dev:
+    project_id: dbt-dev-jaffleshop
+    state_bucket: dbt-dev-jaffleshop-agentic-webapp-tfstate
+  test:
+    project_id: dbt-test-jaffleshop
+    state_bucket: dbt-test-jaffleshop-agentic-webapp-tfstate
+  prod:
+    project_id: dbt-prod-jaffleshop
+    state_bucket: dbt-prod-jaffleshop-agentic-webapp-tfstate
