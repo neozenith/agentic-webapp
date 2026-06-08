@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from agentic_webapp.storage.base import AssetNotFoundError
+from agentic_core.storage.base import AssetNotFoundError
 
 
 def test_put_get_roundtrip(storage, run):

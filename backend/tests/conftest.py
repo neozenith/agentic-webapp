@@ -8,10 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agentic_webapp.api import deps
-from agentic_webapp.database import AssetMetadataManager, InMemoryDatabaseManager
+from agentic_core.database import AssetMetadataManager, InMemoryDatabaseManager
 from agentic_webapp.main import create_app
 from agentic_webapp.services import AssetService
-from agentic_webapp.storage import InMemoryStorageManager
+from agentic_core.storage import InMemoryStorageManager
 
 
 @pytest.fixture

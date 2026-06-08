@@ -1,0 +1,12 @@
+# Root-context docker builds (-f <service>/Dockerfile .) — keep context lean.
+.git/
+**/.venv/
+**/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/dist/
+**/.terraform/
+infra/diagrams/
+tmp/

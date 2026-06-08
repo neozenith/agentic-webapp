@@ -5,14 +5,18 @@ description = "Async FastAPI backend for agentic-webapp: storage + database abst
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "agentic-core",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
     "python-multipart>=0.0.12",
-    "google-cloud-storage>=2.18.0",
-    "google-cloud-bigquery>=3.27.0",
 ]
+
+# Editable path dependency on the shared lib (no uv workspace — keeps the backend
+# independently buildable into its own image; the Dockerfile copies ../libs/core in).
+[tool.uv.sources]
+agentic-core = { path = "../libs/core", editable = true }
 
 [build-system]
 requires = ["hatchling"]
