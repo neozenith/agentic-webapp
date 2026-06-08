@@ -5,12 +5,18 @@ description = "Google ADK agent sidecar for agentic-webapp. Default model: gemin
 requires-python = ">=3.12"
 dependencies = [
     "google-adk>=1.0.0",
+    "agentic-core",
 ]
 
 # App, not a library — we run `adk web agents`, never import this project as a package,
 # so uv shouldn't try to build/install it (just its deps).
 [tool.uv]
 package = false
+
+# Shared GCS/BigQuery lib via editable path dep (same pattern as backend; the agent
+# Dockerfile copies ../libs/core into the image).
+[tool.uv.sources]
+agentic-core = { path = "../libs/core", editable = true }
 
 [dependency-groups]
 dev = []

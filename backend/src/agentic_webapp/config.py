@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     assets_bucket: str | None = None
     bigquery_dataset: str | None = None
     asset_metadata_table: str = "asset_metadata"
+    llm_usage_table: str = "llm_usage"
     # SA whose identity signs V4 URLs via IAM (needed on Cloud Run, which has no key
     # file). Usually the Cloud Run runtime SA; it must hold Token Creator on itself.
     signing_service_account: str | None = None

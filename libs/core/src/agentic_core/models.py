@@ -36,3 +36,20 @@ class SignedUrlResponse(BaseModel):
     asset_id: str
     url: str
     expires_in_seconds: int
+
+
+class LlmUsageRecord(BaseModel):
+    """One itemised LLM call for the bookkeeping inventory: who, when, which model,
+    how many tokens, and the estimated cost. Written by the agent's ADK callback,
+    read by the backend admin panel."""
+
+    request_id: str
+    app_name: str
+    user_id: str
+    session_id: str
+    model_id: str
+    prompt_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    est_cost_usd: float = 0.0
+    timestamp: datetime

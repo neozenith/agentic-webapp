@@ -30,6 +30,27 @@ resource "google_bigquery_table" "asset_metadata" {
   ])
 }
 
+# Bookkeeping inventory: one itemised row per LLM call (written by the agent's ADK
+# callback via LlmUsageManager; read by the backend admin panel).
+resource "google_bigquery_table" "llm_usage" {
+  dataset_id          = google_bigquery_dataset.app.dataset_id
+  table_id            = "llm_usage"
+  deletion_protection = var.environment == "prod"
+
+  schema = jsonencode([
+    { name = "request_id", type = "STRING", mode = "REQUIRED" },
+    { name = "app_name", type = "STRING", mode = "NULLABLE" },
+    { name = "user_id", type = "STRING", mode = "NULLABLE" },
+    { name = "session_id", type = "STRING", mode = "NULLABLE" },
+    { name = "model_id", type = "STRING", mode = "NULLABLE" },
+    { name = "prompt_tokens", type = "INTEGER", mode = "NULLABLE" },
+    { name = "output_tokens", type = "INTEGER", mode = "NULLABLE" },
+    { name = "total_tokens", type = "INTEGER", mode = "NULLABLE" },
+    { name = "est_cost_usd", type = "FLOAT", mode = "NULLABLE" },
+    { name = "timestamp", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
 # Runtime SA can read/write rows in this dataset...
 resource "google_bigquery_dataset_iam_member" "runtime_data_editor" {
   dataset_id = google_bigquery_dataset.app.dataset_id
