@@ -66,6 +66,10 @@ jobs:
         with:
           version: v0.71.0   # pin: avoids the rate-limited unauthenticated 'latest' GitHub API lookup
           cache: true
+        env:
+          # Authenticate the binary download (5000/hr) instead of the anonymous
+          # 60/hr limit, which CI exhausts under repeated runs.
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
