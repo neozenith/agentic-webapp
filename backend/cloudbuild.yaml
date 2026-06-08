@@ -1,0 +1,10 @@
+# Build the backend image from the REPO ROOT context so the editable path dep
+# (libs/core) is inside the Docker context. Invoked by the terraform composite
+# action: gcloud builds submit . --config backend/cloudbuild.yaml --substitutions=_IMAGE=<ref>
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "backend/Dockerfile", "-t", "${_IMAGE}", "."]
+images:
+  - "${_IMAGE}"
+options:
+  logging: CLOUD_LOGGING_ONLY

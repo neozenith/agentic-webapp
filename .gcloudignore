@@ -1,0 +1,12 @@
+# Keep the Cloud Build upload (repo-root context) small.
+.git/
+**/.venv/
+**/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/dist/
+**/.terraform/
+infra/diagrams/
+tmp/

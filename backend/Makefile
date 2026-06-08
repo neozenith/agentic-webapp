@@ -45,8 +45,8 @@ fix: ## Auto-format + fix
 	uvx ruff format . --line-length 120
 	uvx ruff check . --line-length 120 --fix-only
 
-docker-build: ## Build the container image
-	docker build -t $(IMAGE) .
+docker-build: ## Build the container image (repo-root context so libs/core is included)
+	docker build -f Dockerfile -t $(IMAGE) ..
 
 docker-run: ## Run the container locally at http://localhost:$(PORT)
 	docker run --rm -p $(PORT):8080 -e PORT=8080 $(IMAGE)

@@ -11,14 +11,14 @@ from __future__ import annotations
 from functools import lru_cache
 
 from ..config import get_settings
-from ..database import (
+from agentic_core.database import (
     AssetMetadataManager,
     BigQueryDatabaseManager,
     DatabaseManager,
     InMemoryDatabaseManager,
 )
 from ..services import AssetService
-from ..storage import GCSStorageManager, InMemoryStorageManager, StorageManager
+from agentic_core.storage import GCSStorageManager, InMemoryStorageManager, StorageManager
 
 
 @lru_cache

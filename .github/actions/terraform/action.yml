@@ -55,7 +55,13 @@ runs:
     - if: inputs.build_context != ''
       name: Build & push image (${{ inputs.build_image }})
       shell: bash
-      run: gcloud builds submit "${{ inputs.build_context }}" --tag "${{ inputs.build_image }}" --project "dbt-${{ inputs.env }}-jaffleshop"
+      # Repo-root context + the service's cloudbuild.yaml, so a shared lib
+      # (libs/core) is in the Docker context. build_context = the service dir.
+      run: |
+        gcloud builds submit . \
+          --project "dbt-${{ inputs.env }}-jaffleshop" \
+          --config "${{ inputs.build_context }}/cloudbuild.yaml" \
+          --substitutions=_IMAGE="${{ inputs.build_image }}"
 
     - shell: bash
       run: terraform -chdir=infra/stacks/${{ inputs.stack }} init -backend-config=./backends/${{ inputs.env }}.config -reconfigure

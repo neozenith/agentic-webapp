@@ -3,8 +3,8 @@ implementation."""
 
 from datetime import datetime, timezone
 
-from agentic_webapp.database import AssetMetadataManager
-from agentic_webapp.models import AssetMetadata
+from agentic_core.database import AssetMetadataManager
+from agentic_core.models import AssetMetadata
 
 
 def test_insert_get_list_delete(database, run):

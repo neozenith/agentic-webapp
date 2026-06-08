@@ -1,3 +1,6 @@
 # Scratch space (see global tmp/ rule) — also holds tmp/archived/ (mv'd files).
 tmp/
 .DS_Store
+
+# Local agent config (own repo).
+.claude/

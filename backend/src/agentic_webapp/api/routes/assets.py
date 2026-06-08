@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 
-from ...models import AssetMetadata, SignedUrlResponse
+from agentic_core.models import AssetMetadata, SignedUrlResponse
 from ...services import AssetService
 from ..deps import get_asset_service
 
