@@ -1,0 +1,19 @@
+[project]
+name = "agentic-webapp-agent"
+version = "0.1.0"
+description = "Google ADK agent sidecar for agentic-webapp. Default model: gemini-2.5-flash-lite (cheapest), keyless via Vertex AI."
+requires-python = ">=3.12"
+dependencies = [
+    "google-adk>=1.0.0",
+]
+
+# App, not a library — we run `adk web agents`, never import this project as a package,
+# so uv shouldn't try to build/install it (just its deps).
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = []
+
+[tool.ruff]
+line-length = 120
