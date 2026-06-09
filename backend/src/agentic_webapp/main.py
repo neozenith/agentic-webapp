@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api.routes import admin, agent, assets, health
 from .config import get_settings
+from .identity import mask_user_id
 from .logging_setup import configure_logging
 
 IAP_USER_HEADER = "x-goog-authenticated-user-email"
@@ -55,8 +56,16 @@ def create_app() -> FastAPI:
 
     @app.get("/api/me")
     async def me(request: Request) -> dict:
-        """Identity the SPA shows — from IAP in prod (ADR-0004), null when no IAP."""
-        return {"user": _iap_user(request), "environment": settings.environment}
+        """Identity the SPA shows — from IAP in prod (ADR-0004), null when no IAP.
+
+        `user_id` is the pseudonymous, server-authoritative id the SPA uses for session
+        ownership and bookkeeping; the raw email is never used as a key downstream."""
+        email = _iap_user(request)
+        return {
+            "email": email,
+            "user_id": mask_user_id(email) if email else None,
+            "environment": settings.environment,
+        }
 
     _mount_frontend(app, settings)
     return app
