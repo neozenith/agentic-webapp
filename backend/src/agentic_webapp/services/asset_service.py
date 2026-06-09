@@ -5,6 +5,7 @@ the abstractions directly, so a route never has to coordinate the two stores."""
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -91,7 +92,7 @@ class AssetService:
 
     async def combine(
         self,
-        asset_ids: list[str],
+        asset_ids: Sequence[str],
         *,
         separator: bytes = b"",
         filename: str = "combined.bin",

@@ -22,6 +22,8 @@ agentic-core = { path = "../libs/core", editable = true }
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "pytest-cov>=5.0",
+    "mypy>=1.11",
 ]
 
 [tool.ruff]
@@ -32,3 +34,25 @@ testpaths = ["tests"]
 # Make the ADK agents dir importable the way `adk web agents` does (so tests can
 # import `assistant.firestore_session`, mirroring services.py).
 pythonpath = ["agents"]
+addopts = "--cov=agents --cov-report=term-missing"
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_also = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+strict = true
+files = ["agents"]
+mypy_path = ["agents"]
+explicit_package_bases = true
+namespace_packages = true
+
+# Untyped third-party SDKs (ADK, GenAI, Firestore). Strict still applies to our code.
+[[tool.mypy.overrides]]
+module = ["google.adk.*", "google.cloud.*", "google.genai.*"]
+ignore_missing_imports = true

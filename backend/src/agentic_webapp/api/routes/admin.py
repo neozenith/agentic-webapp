@@ -2,7 +2,7 @@
 records for the admin panel. Behind IAP in prod, so only admins reach it."""
 
 from collections import defaultdict
-from typing import Annotated
+from typing import Annotated, Any
 
 from agentic_core.database import LlmUsageManager
 from agentic_core.models import LlmUsageRecord
@@ -16,12 +16,12 @@ UsageDep = Annotated[LlmUsageManager, Depends(get_llm_usage_manager)]
 
 
 @router.get("/usage")
-async def usage_summary(manager: UsageDep, limit: int = 1000) -> dict:
+async def usage_summary(manager: UsageDep, limit: int = 1000) -> dict[str, Any]:
     """Aggregate token/cost usage overall and by model + user."""
     records = await manager.list(limit=limit)
-    totals = {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0}
-    by_model: dict[str, dict] = defaultdict(lambda: {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0})
-    by_user: dict[str, dict] = defaultdict(lambda: {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0})
+    totals: dict[str, Any] = {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0}
+    by_model: dict[str, dict[str, Any]] = defaultdict(lambda: {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0})
+    by_user: dict[str, dict[str, Any]] = defaultdict(lambda: {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0})
 
     for r in records:
         for bucket in (totals, by_model[r.model_id], by_user[r.user_id]):
@@ -29,7 +29,7 @@ async def usage_summary(manager: UsageDep, limit: int = 1000) -> dict:
             bucket["total_tokens"] += r.total_tokens
             bucket["est_cost_usd"] += r.est_cost_usd
 
-    def _round(d: dict) -> dict:
+    def _round(d: dict[str, Any]) -> dict[str, Any]:
         return {**d, "est_cost_usd": round(d["est_cost_usd"], 6)}
 
     return {

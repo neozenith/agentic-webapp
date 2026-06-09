@@ -7,6 +7,7 @@ set_defaults(func=...), and main() dispatching args.func(args) unconditionally."
 
 import argparse
 import logging
+from collections.abc import Callable
 
 from tfs.commands.create import cmd_create
 from tfs.commands.diagram import cmd_diagram
@@ -19,7 +20,7 @@ from tfs.logging_setup import configure_logging
 log = logging.getLogger(__name__)
 
 
-def _help(p: argparse.ArgumentParser):
+def _help(p: argparse.ArgumentParser) -> Callable[[argparse.Namespace], None]:
     """Return a handler that prints help for parser p (used as the default func)."""
 
     def _print_help(_: argparse.Namespace) -> None:
@@ -105,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_diagram.set_defaults(func=cmd_diagram)
 
     # ---- Terraform passthroughs: <command> <stack> <env> [extra...] ----
-    def _add_tf(name: str, *, help: str, extra=None) -> None:
+    def _add_tf(name: str, *, help: str, extra: Callable[[argparse.ArgumentParser], object] | None = None) -> None:
         p = sub.add_parser(name, parents=[common], help=help)
         p.add_argument("stack", help="Stack name")
         p.add_argument("env", choices=VALID_ENVS, help="Target environment")

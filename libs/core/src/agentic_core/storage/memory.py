@@ -7,7 +7,7 @@ still fetch the asset through that endpoint.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 from uuid import uuid4
@@ -62,7 +62,7 @@ class InMemoryStorageManager(StorageManager):
         path.write_bytes(self._objects[key].data)
         return path
 
-    async def signed_url(self, key: str, *, expires_in, method: str = "GET") -> str:  # noqa: ARG002
+    async def signed_url(self, key: str, *, expires_in: timedelta, method: str = "GET") -> str:  # noqa: ARG002
         if key not in self._objects:
             raise AssetNotFoundError(key)
         return f"/api/assets/content/{quote(key)}"

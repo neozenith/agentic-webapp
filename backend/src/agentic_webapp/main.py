@@ -4,14 +4,16 @@ Run locally:  uv run uvicorn agentic_webapp.main:app --reload
 In container:  uvicorn agentic_webapp.main:app --host 0.0.0.0 --port $PORT
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api.routes import admin, agent, assets, health
-from .config import get_settings
+from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
 
@@ -31,7 +33,7 @@ def _iap_user(request: Request) -> str | None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     settings.temp_dir.mkdir(parents=True, exist_ok=True)
@@ -55,7 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(agent.build_router())
 
     @app.get("/api/me")
-    async def me(request: Request) -> dict:
+    async def me(request: Request) -> dict[str, Any]:
         """Identity the SPA shows — from IAP in prod (ADR-0004), null when no IAP.
 
         `user_id` is the pseudonymous, server-authoritative id the SPA uses for session
@@ -71,13 +73,14 @@ def create_app() -> FastAPI:
     return app
 
 
-def _mount_frontend(app: FastAPI, settings) -> None:  # noqa: ANN001
+def _mount_frontend(app: FastAPI, settings: Settings) -> None:
     """Serve the built React SPA (static assets + client-side-routing fallback) when
     present; otherwise a minimal status page. Registered last so API + agent routes win."""
     dist = settings.frontend_dist
     index = dist / "index.html"
 
     if not index.exists():
+
         @app.get("/", response_class=HTMLResponse)
         async def status_page() -> str:
             return (
@@ -86,6 +89,7 @@ def _mount_frontend(app: FastAPI, settings) -> None:  # noqa: ANN001
                 f"<h1>agentic-webapp ({settings.environment})</h1>"
                 "<p>SPA not built. API at <a style=color:#7dd3fc href=/docs>/docs</a>.</p>"
             )
+
         return
 
     app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")

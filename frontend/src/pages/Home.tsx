@@ -5,9 +5,8 @@ export function Home() {
     <section className="card">
       <h1>agentic-webapp</h1>
       <p>
-        A scale-to-zero Cloud Run app: an async FastAPI backend serving this React UI, with a
-        Google ADK agent running as a sidecar. Every LLM call is itemised (tokens + estimated cost)
-        into BigQuery.
+        A scale-to-zero Cloud Run app: an async FastAPI backend serving this React UI, with a Google ADK agent running
+        as a sidecar. Every LLM call is itemised (tokens + estimated cost) into BigQuery.
       </p>
       <div className="row">
         <Link className="btn" to="/chat">

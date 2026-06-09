@@ -34,8 +34,8 @@ ENVS := dev test prod
 # - darwin_amd64: Intel Macs (legacy contributor laptops).
 TF_LOCK_PLATFORMS := linux_amd64 darwin_arm64 darwin_amd64
 
-.PHONY: help bootstrap bootstrap-github create-stack validate-backends gha-check diagram \
-        fmt fmt-check lint docs security lock lock-check validate-all ci
+.PHONY: help install bootstrap bootstrap-github create-stack validate-backends gha-check diagram \
+        fmt fmt-check fix lint docs security lock lock-check validate-all tfs-ci ci
 
 # NOTE: deliberately NOT declaring init-/plan-/apply-/validate-<env> as .PHONY.
 # GNU Make 3.81 (macOS default) has a bug where adding pattern-matched targets
@@ -49,6 +49,9 @@ help: ## Show this help
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
 # ---- One-time bootstrap ----
+
+install: ## Sync the tfs CLI deps
+	uv sync --directory tfs
 
 bootstrap: ## Run GCP-side bootstrap for every project (idempotent)
 	./bootstrap/bootstrap_all.sh
@@ -110,8 +113,19 @@ fmt: ## terraform fmt -recursive (writes changes)
 fmt-check: ## terraform fmt -check -recursive (read-only, CI-safe)
 	terraform fmt -check -recursive
 
-lint: ## tflint --recursive (uses .tflint.hcl; first run needs `tflint --init`)
+fix: ## Auto-fix: terraform fmt + ruff format/fix on the tfs CLI
+	terraform fmt -recursive
+	uvx ruff format tfs
+	uvx ruff check tfs --fix
+
+lint: ## tflint (auto-inits plugins; idempotent)
+	tflint --init
 	tflint --recursive
+
+tfs-ci: ## tfs Python gate: ruff (warnings=errors) + mypy --strict + pytest >=90% coverage
+	uvx ruff check tfs --line-length 120
+	uv run --directory tfs mypy src
+	uv run --directory tfs pytest
 
 docs: ## Regenerate the terraform-docs block in every stack/module README
 	@for d in stacks/*/ modules/*/; do \
@@ -132,4 +146,4 @@ lock-check: ## Fail if STACK's .terraform.lock.hcl is stale (CI gate; mutates fi
 	@git diff --exit-code $(TF_DIR)/.terraform.lock.hcl >/dev/null || \
 	  { echo >&2 "ERROR: $(TF_DIR)/.terraform.lock.hcl is stale. Run 'make STACK=$(STACK) lock' and commit."; exit 1; }
 
-ci: fmt-check security validate-backends gha-check ## Local CI gate (no cloud calls). Run validate-<env> separately.
+ci: fmt-check lint security validate-backends gha-check tfs-ci ## Full QA gate: tf fmt+lint+security + backend/workflow checks + tfs lint/types/tests. Run validate-<env> separately.

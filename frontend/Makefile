@@ -3,7 +3,7 @@ SHELL       := /usr/bin/env bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 
-.PHONY: help install dev build preview
+.PHONY: help install dev build preview fix lint typecheck test ci
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -20,3 +20,17 @@ build: ## Type-check + production build to dist/
 
 preview: ## Preview the production build
 	bun run preview
+
+fix: ## Auto-format + fix lint/imports (biome --write)
+	bun run fix
+
+lint: ## Lint with biome (warnings treated as errors)
+	bun run lint
+
+typecheck: ## Strict type-check (tsc --noEmit)
+	bun run typecheck
+
+test: ## Vitest run with coverage (>=90%)
+	bun run test
+
+ci: lint typecheck test ## Full QA gate (lint + strict types + tests >=90% coverage)
