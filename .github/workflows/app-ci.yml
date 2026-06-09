@@ -1,0 +1,81 @@
+name: App CI
+
+# Per-subproject QA gates (lint + strict types + tests >=90% coverage), one job per
+# language toolchain. Each job runs that subproject's `make ci`. Distinct from the
+# Terraform deploy pipeline (terraform-cicd-*.yml), which only fmt/validates infra.
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "libs/**"
+      - "agent/**"
+      - "infra/**"
+      - "scripts/**"
+      - "Makefile"
+      - ".github/workflows/app-ci.yml"
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Python subprojects. libs/core + agent need the Firestore emulator for real
+  # coverage of the Firestore code; backend does not.
+  python:
+    name: ci ${{ matrix.dir }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { dir: libs/core, emulator: true }
+          - { dir: backend, emulator: false }
+          - { dir: agent, emulator: true }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+      - name: Set up the Firestore emulator
+        if: matrix.emulator
+        uses: google-github-actions/setup-gcloud@v3
+      - name: Install the Firestore emulator component
+        if: matrix.emulator
+        run: |
+          sudo apt-get update && sudo apt-get install -y default-jre
+          gcloud components install cloud-firestore-emulator --quiet
+      - run: make -C ${{ matrix.dir }} install
+      - run: make -C ${{ matrix.dir }} ci
+
+  frontend:
+    name: ci frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - run: make -C frontend install
+      - run: make -C frontend ci
+
+  infra:
+    name: ci infra
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.10.0"
+      - uses: terraform-linters/setup-tflint@v4
+      - uses: aquasecurity/setup-trivy@v0.2.6
+        with:
+          version: v0.71.0
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "infra/tfs/uv.lock"
+      - run: make -C infra install
+      - run: make -C infra ci

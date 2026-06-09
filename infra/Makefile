@@ -34,7 +34,7 @@ ENVS := dev test prod
 # - darwin_amd64: Intel Macs (legacy contributor laptops).
 TF_LOCK_PLATFORMS := linux_amd64 darwin_arm64 darwin_amd64
 
-.PHONY: help bootstrap bootstrap-github create-stack validate-backends gha-check diagram \
+.PHONY: help install bootstrap bootstrap-github create-stack validate-backends gha-check diagram \
         fmt fmt-check fix lint docs security lock lock-check validate-all tfs-ci ci
 
 # NOTE: deliberately NOT declaring init-/plan-/apply-/validate-<env> as .PHONY.
@@ -49,6 +49,9 @@ help: ## Show this help
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
 # ---- One-time bootstrap ----
+
+install: ## Sync the tfs CLI deps
+	uv sync --directory tfs
 
 bootstrap: ## Run GCP-side bootstrap for every project (idempotent)
 	./bootstrap/bootstrap_all.sh

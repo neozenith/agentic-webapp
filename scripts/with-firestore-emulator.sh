@@ -32,12 +32,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# TCP readiness via bash /dev/tcp (no `nc` dependency — portable to CI runners).
+_port_open() { (exec 3<>"/dev/tcp/localhost/${PORT}") 2>/dev/null; }
+
 # Wait for the listener (component install on first run can take ~60s).
 for _ in $(seq 1 90); do
-  if nc -z localhost "$PORT" 2>/dev/null; then break; fi
+  if _port_open; then break; fi
   sleep 1
 done
-if ! nc -z localhost "$PORT" 2>/dev/null; then
+if ! _port_open; then
   echo "ERROR: Firestore emulator did not start on localhost:${PORT}" >&2
   cat "$LOG" >&2
   exit 1
