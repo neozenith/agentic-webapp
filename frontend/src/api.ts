@@ -1,30 +1,79 @@
 // Same-origin calls: FastAPI serves this SPA and proxies the agent endpoints.
 const APP = "assistant";
-const USER = "web-user";
 
-export async function ensureSession(sessionId: string): Promise<void> {
-  await fetch(`/apps/${APP}/users/${USER}/sessions/${sessionId}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: "{}",
-  });
+export interface Me {
+  email: string | null;
+  user_id: string | null;
+  environment: string;
+}
+
+/** The signed-in identity. `user_id` is the pseudonymous, server-authoritative id used
+ * for session ownership (null when there's no IAP, e.g. a bare local run). */
+export async function getMe(): Promise<Me> {
+  const resp = await fetch("/api/me");
+  if (!resp.ok) throw new Error(`me error ${resp.status}`);
+  return resp.json();
 }
 
 interface AdkPart {
   text?: string;
 }
 interface AdkEvent {
+  author?: string;
   content?: { parts?: AdkPart[] };
 }
+export interface AdkSession {
+  id: string;
+  events?: AdkEvent[];
+}
 
-/** Send a message to the agent and return its full text reply. */
-export async function runAgent(sessionId: string, text: string): Promise<string> {
+export interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+/** Create a session. The SERVER mints the id (POST .../sessions with no id in the path);
+ * we read it back. Never generate a session id client-side. */
+export async function createSession(userId: string): Promise<string> {
+  const resp = await fetch(`/apps/${APP}/users/${encodeURIComponent(userId)}/sessions`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  if (!resp.ok) throw new Error(`create session error ${resp.status}`);
+  const session: AdkSession = await resp.json();
+  return session.id;
+}
+
+/** Fetch an existing session (with its events) to resume, or null if it doesn't exist. */
+export async function getSession(userId: string, sessionId: string): Promise<AdkSession | null> {
+  const resp = await fetch(
+    `/apps/${APP}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
+  );
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error(`get session error ${resp.status}`);
+  return resp.json();
+}
+
+/** Rebuild a chat transcript from a resumed session's ADK events. */
+export function sessionToMessages(session: AdkSession): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (const event of session.events ?? []) {
+    const text = (event.content?.parts ?? []).map((p) => p.text ?? "").join("");
+    if (!text) continue; // skip function-call / empty events
+    out.push({ role: event.author === "user" ? "user" : "assistant", text });
+  }
+  return out;
+}
+
+/** Send a message to the agent on an existing server-created session; return its reply. */
+export async function runAgent(userId: string, sessionId: string, text: string): Promise<string> {
   const resp = await fetch("/run", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       app_name: APP,
-      user_id: USER,
+      user_id: userId,
       session_id: sessionId,
       new_message: { role: "user", parts: [{ text }] },
     }),
