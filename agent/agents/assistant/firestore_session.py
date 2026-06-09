@@ -44,7 +44,7 @@ _USER_STATE = "adk_user_state"
 _EVENTS = "events"
 
 
-def _split_state(state: dict[str, Any] | None) -> tuple[dict, dict, dict]:
+def _split_state(state: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Split a flat state dict into (app, user, session) scopes by prefix. temp: keys
     are dropped (never persisted); session scope keeps unprefixed keys verbatim."""
     app: dict[str, Any] = {}
@@ -72,14 +72,14 @@ class FirestoreSessionService(BaseSessionService):
     ) -> None:
         self._client = client or firestore.AsyncClient(project=project, database=database)
 
-    # --- document references -------------------------------------------------
-    def _session_doc(self, app_name: str, user_id: str, session_id: str):
+    # --- document references (Firestore SDK types are untyped -> Any) ---------
+    def _session_doc(self, app_name: str, user_id: str, session_id: str) -> Any:
         return self._client.collection(_SESSIONS).document(f"{app_name}|{user_id}|{session_id}")
 
-    def _app_doc(self, app_name: str):
+    def _app_doc(self, app_name: str) -> Any:
         return self._client.collection(_APP_STATE).document(app_name)
 
-    def _user_doc(self, app_name: str, user_id: str):
+    def _user_doc(self, app_name: str, user_id: str) -> Any:
         return self._client.collection(_USER_STATE).document(f"{app_name}|{user_id}")
 
     async def _merge_scoped_state(self, session: Session) -> None:
