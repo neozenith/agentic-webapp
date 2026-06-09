@@ -8,7 +8,7 @@ SHELL       := /usr/bin/env bash
 IMAGE ?= agentic-webapp-backend:local
 PORT  ?= 8080
 
-.PHONY: help install dev start test typecheck lint fix docker-build docker-run
+.PHONY: help install dev dev-cloud start test typecheck lint fix ci docker-build docker-run
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -35,15 +35,17 @@ start: ## Run locally without reload (production entrypoint)
 test: ## Run the test suite (real impls, no mocks)
 	uv run pytest -q
 
-typecheck: ## Type-check with mypy
-	uvx mypy src
+typecheck: ## Strict type-check (mypy --strict via pyproject; runs in the venv so deps resolve)
+	uv run mypy src
 
-lint: ## Lint with ruff
+lint: ## Lint — any finding fails (warnings treated as errors)
 	uvx ruff check . --line-length 120
 
 fix: ## Auto-format + fix
 	uvx ruff format . --line-length 120
 	uvx ruff check . --line-length 120 --fix-only
+
+ci: lint typecheck test ## Full QA gate (lint + strict types + tests >=90% coverage)
 
 docker-build: ## Build the container image (repo-root context so libs/core is included)
 	docker build -f Dockerfile -t $(IMAGE) ..

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter
 
 from ...config import get_settings
@@ -11,7 +13,7 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-async def health() -> dict:
+async def health() -> dict[str, Any]:
     s = get_settings()
     return {
         "status": "ok",

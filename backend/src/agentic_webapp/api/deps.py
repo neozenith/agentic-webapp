@@ -29,7 +29,7 @@ def get_storage() -> StorageManager:
     if s.storage_backend == "gcs":
         if not s.assets_bucket:
             raise RuntimeError("STORAGE_BACKEND=gcs requires ASSETS_BUCKET to be set")
-        return GCSStorageManager(
+        return GCSStorageManager(  # pragma: no cover — real GCS client; covered by live deploy
             s.assets_bucket,
             signing_service_account=s.signing_service_account,
             temp_dir=s.temp_dir,
@@ -43,11 +43,15 @@ def get_database() -> DatabaseManager:
     if s.database_backend == "bigquery":
         if not (s.gcp_project and s.bigquery_dataset):
             raise RuntimeError("DATABASE_BACKEND=bigquery requires GCP_PROJECT and BIGQUERY_DATASET")
-        return BigQueryDatabaseManager(project=s.gcp_project, dataset=s.bigquery_dataset)
+        return BigQueryDatabaseManager(
+            project=s.gcp_project, dataset=s.bigquery_dataset
+        )  # pragma: no cover — real BQ client; covered by live deploy
     if s.database_backend == "firestore":
         if not (s.gcp_project and s.firestore_database):
             raise RuntimeError("DATABASE_BACKEND=firestore requires GCP_PROJECT and FIRESTORE_DATABASE")
-        return FirestoreDatabaseManager(project=s.gcp_project, database=s.firestore_database)
+        return FirestoreDatabaseManager(
+            project=s.gcp_project, database=s.firestore_database
+        )  # pragma: no cover — real Firestore client; covered by libs/core emulator tests + live deploy
     return InMemoryDatabaseManager()
 
 
