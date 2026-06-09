@@ -4,3 +4,11 @@ tmp/
 
 # Local agent config (own repo).
 .claude/
+
+# Coverage + test artifacts (pytest-cov, vitest v8, emulator logs).
+.coverage
+coverage/
+htmlcov/
+.pytest_cache/
+.mmdc_cache/
+.vitest/
