@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import {
-  type ChatMessage,
-  createSession,
-  getMe,
-  getSession,
-  runAgent,
-  sessionToMessages,
-} from "../api";
+import { type ChatMessage, createSession, getMe, getSession, runAgent, sessionToMessages } from "../api";
 
 export function Chat() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -101,6 +94,7 @@ export function Chat() {
         {loading && <p className="muted">Loading session…</p>}
         {!loading && messages.length === 0 && <p className="muted">Ask the agent something…</p>}
         {messages.map((m, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the chat log is append-only and never reordered
           <div key={i} className={`msg ${m.role}`}>
             <span className="who">{m.role === "user" ? "you" : "agent"}</span>
             <div className="bubble">{m.text}</div>

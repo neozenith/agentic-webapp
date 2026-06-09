@@ -45,7 +45,9 @@ export function Admin() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUsage().then(setData).catch((e) => setError(String(e)));
+    fetchUsage()
+      .then(setData)
+      .catch((e) => setError(String(e)));
   }, []);
 
   if (error) return <p className="error">⚠️ {error}</p>;
