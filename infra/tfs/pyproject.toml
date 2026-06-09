@@ -28,4 +28,47 @@ packages = ["src/tfs"]
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "mypy>=1.11",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-report=term-missing"
+
+[tool.coverage.run]
+# External-CLI orchestration + template codegen: exercised by live terraform/gcloud
+# runs and the CI pipeline, not unit-testable without mocks (banned) or a full
+# repo+git+graphviz integration harness. The pure-logic core (config/backends/roots/
+# validate/app) is covered to >=90%.
+omit = [
+    "*/commands/diagram.py",
+    "*/commands/terraform.py",
+    "*/commands/create.py",
+    "*/commands/gha.py",
+    "*/gcp.py",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_also = ["pragma: no cover", "raise NotImplementedError", "if TYPE_CHECKING:"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+mypy_path = ["src"]
+
+# Untyped third-party libs.
+[[tool.mypy.overrides]]
+module = ["diagrams.*", "ruamel.*", "jinja2.*"]
+ignore_missing_imports = true
+
+# External-CLI orchestration modules wrap untyped subprocess/diagrams output; they are
+# excluded from coverage and exercised by live runs, so strict typing is relaxed here.
+[[tool.mypy.overrides]]
+module = ["tfs.commands.diagram", "tfs.commands.terraform", "tfs.gcp"]
+ignore_errors = true

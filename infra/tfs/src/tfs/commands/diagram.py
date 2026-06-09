@@ -95,7 +95,9 @@ def _short_type(tf_type: str) -> str:
 
 
 def _run_tf(infra_root: Path, args: str, *, capture: bool) -> str:
-    result = subprocess.run(shlex.split(f"terraform {args}"), cwd=infra_root, text=True, capture_output=capture, check=True)
+    result = subprocess.run(
+        shlex.split(f"terraform {args}"), cwd=infra_root, text=True, capture_output=capture, check=True
+    )
     return result.stdout if capture else ""
 
 
@@ -185,7 +187,9 @@ def cmd_diagram(args: Namespace) -> None:
         for address, tf_type, name, actions, after, mode in _iter_changes(doc):
             if mode == "data":
                 continue
-            entry = nodes.setdefault(_base_address(address), {"type": tf_type, "name": name, "actions": actions, "count": 0})
+            entry = nodes.setdefault(
+                _base_address(address), {"type": tf_type, "name": name, "actions": actions, "count": 0}
+            )
             entry["count"] += 1
             entry["role"] = after.get("role")
     else:
