@@ -24,4 +24,10 @@ EXPOSE 8081
 # --allow_origins '*': the sidecar sits behind the backend proxy (which already
 # strips the browser Origin), so ADK's own origin guard is redundant here; widening
 # it also lets the direct dev UI on :8081 be opened for debugging.
-CMD [".venv/bin/adk", "web", "--host", "0.0.0.0", "--port", "8081", "--allow_origins", "*", "agents"]
+#
+# Session persistence is opt-in via SESSION_SERVICE_URI (e.g. firestore://). When set,
+# agents/services.py maps the firestore:// scheme to the durable FirestoreSessionService
+# (DB id from FIRESTORE_DATABASE); when unset, ADK uses its in-memory session service.
+# Shell form + exec so env expands AND adk stays PID 1 (receives SIGTERM on Cloud Run).
+CMD exec .venv/bin/adk web --host 0.0.0.0 --port 8081 --allow_origins '*' \
+    ${SESSION_SERVICE_URI:+--session_service_uri $SESSION_SERVICE_URI} agents
