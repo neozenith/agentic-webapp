@@ -105,3 +105,49 @@ export async function fetchUsage(): Promise<UsageSummary> {
   if (!resp.ok) throw new Error(`usage error ${resp.status}`);
   return resp.json();
 }
+
+// --- Session explorer (ADK list-sessions; note ADK serialises camelCase) ---
+export interface SessionMeta {
+  id: string;
+  lastUpdateTime?: number;
+}
+
+/** List the signed-in user's sessions, most-recent first. */
+export async function listSessions(userId: string): Promise<SessionMeta[]> {
+  const resp = await fetch(`/apps/${APP}/users/${encodeURIComponent(userId)}/sessions`);
+  if (!resp.ok) throw new Error(`sessions error ${resp.status}`);
+  const sessions: SessionMeta[] = await resp.json();
+  return [...sessions].sort((a, b) => (b.lastUpdateTime ?? 0) - (a.lastUpdateTime ?? 0));
+}
+
+// --- Asset explorer (backend serialises snake_case) ---
+export interface Asset {
+  asset_id: string;
+  filename: string | null;
+  content_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+}
+
+export async function listAssets(limit = 100): Promise<Asset[]> {
+  const resp = await fetch(`/api/assets?limit=${limit}`);
+  if (!resp.ok) throw new Error(`assets error ${resp.status}`);
+  return resp.json();
+}
+
+// --- Admin: itemised usage records (each carries a session_id to relaunch) ---
+export interface UsageRecord {
+  request_id: string;
+  session_id: string;
+  user_id: string;
+  model_id: string;
+  total_tokens: number;
+  est_cost_usd: number;
+  timestamp: string;
+}
+
+export async function fetchUsageRecords(limit = 100): Promise<UsageRecord[]> {
+  const resp = await fetch(`/api/admin/usage/records?limit=${limit}`);
+  if (!resp.ok) throw new Error(`records error ${resp.status}`);
+  return resp.json();
+}

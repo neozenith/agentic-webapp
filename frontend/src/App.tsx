@@ -3,6 +3,8 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 const TABS = [
   ["/", "Home"],
   ["/chat", "Chat"],
+  ["/sessions", "Sessions"],
+  ["/assets", "Assets"],
   ["/admin", "Admin"],
 ] as const;
 
