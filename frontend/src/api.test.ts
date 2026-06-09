@@ -1,7 +1,17 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { createSession, fetchUsage, getMe, getSession, runAgent, sessionToMessages } from "./api";
+import {
+  createSession,
+  fetchUsage,
+  fetchUsageRecords,
+  getMe,
+  getSession,
+  listAssets,
+  listSessions,
+  runAgent,
+  sessionToMessages,
+} from "./api";
 import { server } from "./test/server";
 
 describe("sessionToMessages", () => {
@@ -96,5 +106,61 @@ describe("fetchUsage", () => {
   it("throws on error", async () => {
     server.use(http.get("/api/admin/usage", () => new HttpResponse(null, { status: 500 })));
     await expect(fetchUsage()).rejects.toThrow("usage error 500");
+  });
+});
+
+describe("listSessions", () => {
+  it("returns sessions sorted by lastUpdateTime descending", async () => {
+    server.use(
+      http.get("/apps/assistant/users/uid/sessions", () =>
+        HttpResponse.json([
+          { id: "a", lastUpdateTime: 1 },
+          { id: "c", lastUpdateTime: 3 },
+          { id: "b" }, // missing time -> treated as 0
+        ]),
+      ),
+    );
+    expect((await listSessions("uid")).map((s) => s.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("throws on error", async () => {
+    server.use(http.get("/apps/assistant/users/uid/sessions", () => new HttpResponse(null, { status: 500 })));
+    await expect(listSessions("uid")).rejects.toThrow("sessions error 500");
+  });
+});
+
+describe("listAssets", () => {
+  it("returns the asset list", async () => {
+    const assets = [{ asset_id: "a1", filename: "f", content_type: "text/plain", size_bytes: 1, created_at: "x" }];
+    server.use(http.get("/api/assets", () => HttpResponse.json(assets)));
+    expect(await listAssets()).toEqual(assets);
+  });
+
+  it("throws on error", async () => {
+    server.use(http.get("/api/assets", () => new HttpResponse(null, { status: 500 })));
+    await expect(listAssets()).rejects.toThrow("assets error 500");
+  });
+});
+
+describe("fetchUsageRecords", () => {
+  it("returns the records", async () => {
+    const records = [
+      {
+        request_id: "r",
+        session_id: "s",
+        user_id: "u",
+        model_id: "m",
+        total_tokens: 1,
+        est_cost_usd: 0,
+        timestamp: "t",
+      },
+    ];
+    server.use(http.get("/api/admin/usage/records", () => HttpResponse.json(records)));
+    expect(await fetchUsageRecords()).toEqual(records);
+  });
+
+  it("throws on error", async () => {
+    server.use(http.get("/api/admin/usage/records", () => new HttpResponse(null, { status: 500 })));
+    await expect(fetchUsageRecords()).rejects.toThrow("records error 500");
   });
 });
