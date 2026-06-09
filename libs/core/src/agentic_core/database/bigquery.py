@@ -17,10 +17,12 @@ from typing import Any
 
 from google.cloud import bigquery
 
-from .base import DatabaseManager, Row
+from .base import DatabaseManager, Row, Rows
 
 
-class BigQueryDatabaseManager(DatabaseManager):
+class BigQueryDatabaseManager(
+    DatabaseManager
+):  # pragma: no cover — real BigQuery SDK; un-mockable per no-mock rule (covered by live deploy)
     def __init__(
         self,
         *,
@@ -35,7 +37,7 @@ class BigQueryDatabaseManager(DatabaseManager):
     def _table_id(self, table: str) -> str:
         return f"{self._project}.{self._dataset}.{table}"
 
-    async def insert(self, table: str, rows: list[Row]) -> None:
+    async def insert(self, table: str, rows: Rows) -> None:
         def _insert() -> None:
             errors = self._client.insert_rows_json(self._table_id(table), rows)
             if errors:
@@ -48,7 +50,7 @@ class BigQueryDatabaseManager(DatabaseManager):
         rows = await self.query(sql, params={"key": key})
         return rows[0] if rows else None
 
-    async def list(self, table: str, *, limit: int = 100, order_by: str | None = None) -> list[Row]:
+    async def list(self, table: str, *, limit: int = 100, order_by: str | None = None) -> Rows:
         order = f"ORDER BY `{order_by}` DESC" if order_by else ""
         sql = f"SELECT * FROM `{self._table_id(table)}` {order} LIMIT @limit"
         return await self.query(sql, params={"limit": limit})
@@ -57,8 +59,8 @@ class BigQueryDatabaseManager(DatabaseManager):
         sql = f"DELETE FROM `{self._table_id(table)}` WHERE `{key_field}` = @key"
         await self.query(sql, params={"key": key})
 
-    async def query(self, sql: str, *, params: dict[str, Any] | None = None) -> list[Row]:
-        def _query() -> list[Row]:
+    async def query(self, sql: str, *, params: dict[str, Any] | None = None) -> Rows:
+        def _query() -> Rows:
             job_config = bigquery.QueryJobConfig(
                 query_parameters=[_to_query_param(name, value) for name, value in (params or {}).items()]
             )
@@ -68,7 +70,7 @@ class BigQueryDatabaseManager(DatabaseManager):
         return await asyncio.to_thread(_query)
 
 
-def _to_query_param(name: str, value: Any) -> bigquery.ScalarQueryParameter:
+def _to_query_param(name: str, value: Any) -> bigquery.ScalarQueryParameter:  # pragma: no cover
     """Map a Python value to a typed BigQuery scalar parameter."""
     if isinstance(value, bool):
         type_ = "BOOL"

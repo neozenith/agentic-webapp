@@ -13,18 +13,21 @@ IAM signBlob. That SA must hold roles/iam.serviceAccountTokenCreator on itself
 import asyncio
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from google.auth import default as google_auth_default
 from google.auth.transport.requests import Request as AuthRequest
-from google.cloud import storage
+from google.cloud import storage  # type: ignore[attr-defined]
 from google.cloud.exceptions import NotFound
 
 from ..models import StoredAsset
 from .base import AssetNotFoundError, StorageManager
 
 
-class GCSStorageManager(StorageManager):
+class GCSStorageManager(
+    StorageManager
+):  # pragma: no cover — real GCS SDK; un-mockable per no-mock rule (covered by live deploy)
     def __init__(
         self,
         bucket: str,
@@ -50,7 +53,7 @@ class GCSStorageManager(StorageManager):
     async def get(self, key: str) -> bytes:
         def _get() -> bytes:
             try:
-                return self._bucket.blob(key).download_as_bytes()
+                return self._bucket.blob(key).download_as_bytes()  # type: ignore[no-any-return]
             except NotFound as exc:
                 raise AssetNotFoundError(key) from exc
 
@@ -95,12 +98,12 @@ class GCSStorageManager(StorageManager):
     async def signed_url(self, key: str, *, expires_in: timedelta, method: str = "GET") -> str:
         def _sign() -> str:
             blob = self._bucket.blob(key)
-            kwargs: dict = {"version": "v4", "expiration": expires_in, "method": method}
+            kwargs: dict[str, Any] = {"version": "v4", "expiration": expires_in, "method": method}
             if self._signing_sa:
                 creds, _ = google_auth_default()
-                creds.refresh(AuthRequest())
+                creds.refresh(AuthRequest())  # type: ignore[no-untyped-call]
                 kwargs["service_account_email"] = self._signing_sa
                 kwargs["access_token"] = creds.token
-            return blob.generate_signed_url(**kwargs)
+            return blob.generate_signed_url(**kwargs)  # type: ignore[no-any-return]
 
         return await asyncio.to_thread(_sign)

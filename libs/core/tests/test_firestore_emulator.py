@@ -43,6 +43,8 @@ def test_insert_get_list_delete():
         assert (await db.get(table, key_field="id", key="1"))["v"] == "a"
         assert await db.get(table, key_field="id", key="missing") is None
         assert len(await db.list(table)) == 2
+        ordered = await db.list(table, order_by="id")  # exercises the order_by branch
+        assert [r["id"] for r in ordered] == ["2", "1"]
         await db.delete(table, key_field="id", key="1")
         assert await db.get(table, key_field="id", key="1") is None
 

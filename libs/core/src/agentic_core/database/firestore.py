@@ -18,7 +18,7 @@ from typing import Any
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from .base import DatabaseManager, Row
+from .base import DatabaseManager, Row, Rows
 
 
 class FirestoreDatabaseManager(DatabaseManager):
@@ -33,7 +33,7 @@ class FirestoreDatabaseManager(DatabaseManager):
         self._database = database
         self._client = client or firestore.AsyncClient(project=project, database=database)
 
-    async def insert(self, table: str, rows: list[Row]) -> None:
+    async def insert(self, table: str, rows: Rows) -> None:
         col = self._client.collection(table)
         for row in rows:
             await col.add(dict(row))
@@ -44,7 +44,7 @@ class FirestoreDatabaseManager(DatabaseManager):
             return doc.to_dict()
         return None
 
-    async def list(self, table: str, *, limit: int = 100, order_by: str | None = None) -> list[Row]:
+    async def list(self, table: str, *, limit: int = 100, order_by: str | None = None) -> Rows:
         query: Any = self._client.collection(table)
         if order_by:
             query = query.order_by(order_by, direction=firestore.Query.DESCENDING)
@@ -56,5 +56,5 @@ class FirestoreDatabaseManager(DatabaseManager):
         async for doc in query.stream():
             await doc.reference.delete()
 
-    async def query(self, sql: str, *, params: dict[str, Any] | None = None) -> list[Row]:
+    async def query(self, sql: str, *, params: dict[str, Any] | None = None) -> Rows:
         raise NotImplementedError("FirestoreDatabaseManager does not support raw SQL; use the typed methods.")

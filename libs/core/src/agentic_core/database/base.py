@@ -12,6 +12,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 Row = dict[str, Any]
+# Alias for the row-list return/param type. Defined at module scope (where the builtin
+# `list` isn't shadowed) so the `list` METHOD below doesn't capture `list[Row]` hints.
+Rows = list[Row]
 
 
 class DatabaseManager(ABC):
@@ -19,7 +22,7 @@ class DatabaseManager(ABC):
     maps them onto a dataset/schema)."""
 
     @abstractmethod
-    async def insert(self, table: str, rows: list[Row]) -> None:
+    async def insert(self, table: str, rows: Rows) -> None:
         """Append rows to a table."""
 
     @abstractmethod
@@ -27,7 +30,7 @@ class DatabaseManager(ABC):
         """Return the single row whose key_field == key, or None."""
 
     @abstractmethod
-    async def list(self, table: str, *, limit: int = 100, order_by: str | None = None) -> list[Row]:
+    async def list(self, table: str, *, limit: int = 100, order_by: str | None = None) -> Rows:
         """Return up to `limit` rows, optionally ordered by a column (desc)."""
 
     @abstractmethod
@@ -35,7 +38,7 @@ class DatabaseManager(ABC):
         """Delete rows whose key_field == key. No-op if none match."""
 
     @abstractmethod
-    async def query(self, sql: str, *, params: dict[str, Any] | None = None) -> list[Row]:
+    async def query(self, sql: str, *, params: dict[str, Any] | None = None) -> Rows:
         """Run a read query and return rows. `sql` dialect is implementation-specific
         — use the typed methods above for portable code; reach for query() only when
         you knowingly target a specific backend."""
