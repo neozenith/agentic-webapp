@@ -2,8 +2,10 @@
 (token counts + estimated cost, per user + session + model + timestamp) via the
 shared agentic-core LlmUsageManager.
 
-Backend selection mirrors the rest of the project: BigQuery when configured
-(BIGQUERY_DATASET + project), otherwise in-memory (local/dev — not durable).
+Backend selection mirrors the backend's DATABASE_BACKEND switch: Firestore (default in
+the deployed envs) or BigQuery when configured, otherwise in-memory (local/dev — not
+durable). When DATABASE_BACKEND is unset, fall back to presence-based detection so the
+agent stays usable without extra config.
 """
 
 from __future__ import annotations
@@ -13,7 +15,12 @@ import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from agentic_core.database import BigQueryDatabaseManager, InMemoryDatabaseManager, LlmUsageManager
+from agentic_core.database import (
+    BigQueryDatabaseManager,
+    FirestoreDatabaseManager,
+    InMemoryDatabaseManager,
+    LlmUsageManager,
+)
 from agentic_core.models import LlmUsageRecord
 from agentic_core.pricing import estimate_cost_usd
 
@@ -23,13 +30,22 @@ _MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash-lite")
 
 
 def _build_usage_manager() -> LlmUsageManager:
-    dataset = os.environ.get("BIGQUERY_DATASET")
     project = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
     table = os.environ.get("LLM_USAGE_TABLE", "llm_usage")
-    if dataset and project:
+    backend = os.environ.get("DATABASE_BACKEND", "").lower()
+    firestore_db = os.environ.get("FIRESTORE_DATABASE")
+    dataset = os.environ.get("BIGQUERY_DATASET")
+
+    want_firestore = backend == "firestore" or (not backend and firestore_db)
+    want_bigquery = backend == "bigquery" or (not backend and dataset and not firestore_db)
+
+    if want_firestore and project and firestore_db:
+        log.info("LLM usage -> Firestore %s/%s table=%s", project, firestore_db, table)
+        return LlmUsageManager(FirestoreDatabaseManager(project=project, database=firestore_db), table=table)
+    if want_bigquery and project and dataset:
         log.info("LLM usage -> BigQuery %s.%s.%s", project, dataset, table)
         return LlmUsageManager(BigQueryDatabaseManager(project=project, dataset=dataset), table=table)
-    log.warning("BIGQUERY_DATASET/GCP_PROJECT unset — LLM usage recorded in-memory only (not durable)")
+    log.warning("No durable DB configured (DATABASE_BACKEND/FIRESTORE_DATABASE/BIGQUERY_DATASET) — LLM usage in-memory only")
     return LlmUsageManager(InMemoryDatabaseManager(), table=table)
 
 

@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 StorageBackend = Literal["memory", "gcs"]
-DatabaseBackend = Literal["memory", "bigquery"]
+DatabaseBackend = Literal["memory", "bigquery", "firestore"]
 
 
 class Settings(BaseSettings):
@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     gcp_project: str | None = None
     assets_bucket: str | None = None
     bigquery_dataset: str | None = None
+    # Firestore (named) database id, required only when database_backend=firestore.
+    firestore_database: str | None = None
     asset_metadata_table: str = "asset_metadata"
     llm_usage_table: str = "llm_usage"
     # SA whose identity signs V4 URLs via IAM (needed on Cloud Run, which has no key

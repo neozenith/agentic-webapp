@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "google-adk>=1.0.0",
     "agentic-core",
+    "google-cloud-firestore>=2.27.0",
 ]
 
 # App, not a library — we run `adk web agents`, never import this project as a package,
@@ -19,7 +20,15 @@ package = false
 agentic-core = { path = "../libs/core", editable = true }
 
 [dependency-groups]
-dev = []
+dev = [
+    "pytest>=9.0.3",
+]
 
 [tool.ruff]
 line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Make the ADK agents dir importable the way `adk web agents` does (so tests can
+# import `assistant.firestore_session`, mirroring services.py).
+pythonpath = ["agents"]

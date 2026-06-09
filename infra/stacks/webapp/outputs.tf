@@ -55,3 +55,8 @@ output "bigquery_dataset" {
   description = "BigQuery dataset the webapp interfaces against."
   value       = google_bigquery_dataset.app.dataset_id
 }
+
+output "firestore_database" {
+  description = "Firestore (named) database backing durable ADK sessions + app data (default tabular store)."
+  value       = google_firestore_database.app.name
+}

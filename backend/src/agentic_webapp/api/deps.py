@@ -15,6 +15,7 @@ from agentic_core.database import (
     AssetMetadataManager,
     BigQueryDatabaseManager,
     DatabaseManager,
+    FirestoreDatabaseManager,
     InMemoryDatabaseManager,
     LlmUsageManager,
 )
@@ -43,6 +44,10 @@ def get_database() -> DatabaseManager:
         if not (s.gcp_project and s.bigquery_dataset):
             raise RuntimeError("DATABASE_BACKEND=bigquery requires GCP_PROJECT and BIGQUERY_DATASET")
         return BigQueryDatabaseManager(project=s.gcp_project, dataset=s.bigquery_dataset)
+    if s.database_backend == "firestore":
+        if not (s.gcp_project and s.firestore_database):
+            raise RuntimeError("DATABASE_BACKEND=firestore requires GCP_PROJECT and FIRESTORE_DATABASE")
+        return FirestoreDatabaseManager(project=s.gcp_project, database=s.firestore_database)
     return InMemoryDatabaseManager()
 
 

@@ -54,9 +54,11 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "STORAGE_BACKEND"
         value = "gcs"
       }
+      # Firestore is the default tabular store; BIGQUERY_DATASET is kept below so an
+      # env can revert by flipping this back to "bigquery" (no code/infra change).
       env {
         name  = "DATABASE_BACKEND"
-        value = "bigquery"
+        value = "firestore"
       }
       env {
         name  = "GCP_PROJECT"
@@ -65,6 +67,10 @@ resource "google_cloud_run_v2_service" "app" {
       env {
         name  = "ASSETS_BUCKET"
         value = google_storage_bucket.assets.name
+      }
+      env {
+        name  = "FIRESTORE_DATABASE"
+        value = google_firestore_database.app.name
       }
       env {
         name  = "BIGQUERY_DATASET"
@@ -131,10 +137,25 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "AGENT_MODEL"
         value = var.agent_model
       }
-      # Bookkeeping target (LlmUsageManager writes here via agentic-core).
+      # Durable ADK sessions in Firestore (services.py maps firestore:// to the custom
+      # FirestoreSessionService; DB id from FIRESTORE_DATABASE). Unset => in-memory.
+      env {
+        name  = "SESSION_SERVICE_URI"
+        value = "firestore://"
+      }
+      # Bookkeeping target (LlmUsageManager writes here via agentic-core). Firestore by
+      # default; BIGQUERY_DATASET kept so an env can revert via DATABASE_BACKEND.
+      env {
+        name  = "DATABASE_BACKEND"
+        value = "firestore"
+      }
       env {
         name  = "GCP_PROJECT"
         value = local.project_id
+      }
+      env {
+        name  = "FIRESTORE_DATABASE"
+        value = google_firestore_database.app.name
       }
       env {
         name  = "BIGQUERY_DATASET"

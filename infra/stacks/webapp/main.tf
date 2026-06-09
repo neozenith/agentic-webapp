@@ -43,3 +43,8 @@ resource "google_project_service" "aiplatform" {
   service            = "aiplatform.googleapis.com"
   disable_on_destroy = false
 }
+
+resource "google_project_service" "firestore" {
+  service            = "firestore.googleapis.com"
+  disable_on_destroy = false
+}
