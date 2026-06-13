@@ -5,19 +5,24 @@ import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchUserSessions, type SessionSummary } from "../api";
+import { fetchUserSessions, listSessions, type SessionSummary } from "../api";
 
 const usd = (n: number) => `$${n.toFixed(6)}`;
 
 export function AdminUser() {
   const { userId = "" } = useParams<{ userId: string }>();
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [titles, setTitles] = useState<Map<string, string | undefined>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUserSessions(userId)
       .then(setSessions)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    // Titles are supplementary: a failed fetch must not block the cost rows.
+    listSessions(userId)
+      .then((metas) => setTitles(new Map(metas.map((m) => [m.id, m.state?.title]))))
+      .catch(() => setTitles(new Map()));
   }, [userId]);
 
   if (error) return <p className="text-destructive">⚠️ {error}</p>;
@@ -48,6 +53,7 @@ export function AdminUser() {
             <TableHeader>
               <TableRow>
                 <TableHead>session</TableHead>
+                <TableHead>id</TableHead>
                 <TableHead>calls</TableHead>
                 <TableHead>tokens</TableHead>
                 <TableHead>cost</TableHead>
@@ -58,6 +64,7 @@ export function AdminUser() {
             <TableBody>
               {sessions.map((s) => (
                 <TableRow key={s.session_id}>
+                  <TableCell>{titles.get(s.session_id) || "Untitled session"}</TableCell>
                   <TableCell className="font-mono text-xs">{s.session_id.slice(0, 12)}…</TableCell>
                   <TableCell>{s.calls}</TableCell>
                   <TableCell>{s.total_tokens}</TableCell>

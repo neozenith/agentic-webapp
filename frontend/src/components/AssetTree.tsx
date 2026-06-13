@@ -1,43 +1,44 @@
-import { ChevronRight, Folder, FolderOpen, Share2 } from "lucide-react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { ChevronRight, Folder as FolderIcon, FolderOpen, Share2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { buildTree, displayName, fmtSize, iconFor, type TreeNode, type ViewMode } from "@/lib/assetTree";
+import { displayName, fmtSize, iconFor } from "@/lib/assetTree";
 import { cn } from "@/lib/utils";
-import type { Asset } from "../api";
-
-const MODES: { value: ViewMode; label: string }[] = [
-  { value: "type", label: "Type" },
-  { value: "folder", label: "Folder" },
-  { value: "date", label: "Date" },
-];
+import type { Asset, Folder } from "../api";
 
 const INDENT = 16; // px per depth level
 const fmtDate = (iso: string): string => new Date(iso).toLocaleDateString();
 
-// Viewer context so ownership/share controls don't have to prop-drill through the recursion.
-interface OwnerCtx {
+/** Everything the recursive rows need, bundled so module-level row components stay
+ * stable (defining components inline would remount the tree on every render). */
+interface TreeCtx {
   viewerId: string | null;
   isAdmin: boolean;
-  onShare?: (asset: Asset) => void;
+  foldersByParent: Map<string | null, Folder[]>;
+  assetsByFolder: Map<string | null, Asset[]>;
+  folderOptions: Folder[];
+  open: Set<string>;
+  toggle: (id: string) => void;
+  countFor: (folderId: string) => number;
+  onShareAsset: (a: Asset) => void;
+  onShareFolder: (f: Folder) => void;
+  onMoveAsset: (a: Asset, folderId: string | null) => void;
 }
-const OwnerContext = createContext<OwnerCtx>({ viewerId: null, isAdmin: false });
 
-function OwnerBadge({ asset }: { asset: Asset }) {
-  const { viewerId, isAdmin } = useContext(OwnerContext);
+function OwnerBadge({ asset, ctx }: { asset: Asset; ctx: TreeCtx }) {
   if (!asset.owner_id) return null; // legacy/unowned
-  if (asset.owner_id === viewerId) return <Badge variant="outline">you</Badge>;
-  if (viewerId && asset.shared_with?.includes(viewerId)) return <Badge variant="muted">shared</Badge>;
+  if (asset.owner_id === ctx.viewerId) return <Badge variant="outline">you</Badge>;
+  if (ctx.viewerId && asset.shared_user_ids?.includes(ctx.viewerId)) return <Badge variant="muted">shared</Badge>;
   // Admin viewing someone else's asset: surface the (pseudonymous) owner.
-  if (isAdmin) return <Badge variant="muted">owner {asset.owner_id.slice(0, 8)}…</Badge>;
+  if (ctx.isAdmin) return <Badge variant="muted">owner {asset.owner_id.slice(0, 8)}…</Badge>;
   return null;
 }
 
-function FileRow({ asset, depth }: { asset: Asset; depth: number }) {
-  const { viewerId, isAdmin, onShare } = useContext(OwnerContext);
+function FileRow({ asset, depth, ctx }: { asset: Asset; depth: number; ctx: TreeCtx }) {
   const Icon = iconFor(asset.content_type);
-  const canShare = !!onShare && (isAdmin || (!!asset.owner_id && asset.owner_id === viewerId));
+  const canShare = ctx.isAdmin || (!!asset.owner_id && asset.owner_id === ctx.viewerId);
+  const name = displayName(asset);
   return (
     <div
       className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60"
@@ -50,17 +51,30 @@ function FileRow({ asset, depth }: { asset: Asset; depth: number }) {
         rel="noreferrer"
         className="truncate text-secondary-foreground hover:underline"
       >
-        {displayName(asset)}
+        {name}
       </a>
-      <OwnerBadge asset={asset} />
+      <OwnerBadge asset={asset} ctx={ctx} />
+      <select
+        aria-label={`Move ${name}`}
+        value={asset.folder_id ?? ""}
+        onChange={(e) => ctx.onMoveAsset(asset, e.target.value === "" ? null : e.target.value)}
+        className="ml-1 h-6 rounded-md border border-border bg-transparent px-1 text-xs text-muted-foreground"
+      >
+        <option value="">— root —</option>
+        {ctx.folderOptions.map((f) => (
+          <option key={f.folder_id} value={f.folder_id}>
+            {f.name}
+          </option>
+        ))}
+      </select>
       {canShare && (
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="size-6"
-          aria-label={`Share ${displayName(asset)}`}
-          onClick={() => onShare?.(asset)}
+          aria-label={`Share ${name}`}
+          onClick={() => ctx.onShareAsset(asset)}
         >
           <Share2 className="size-3.5" />
         </Button>
@@ -73,121 +87,155 @@ function FileRow({ asset, depth }: { asset: Asset; depth: number }) {
   );
 }
 
-function FolderRow({
-  node,
-  depth,
-  open,
-  toggle,
-}: {
-  node: TreeNode;
-  depth: number;
-  open: Set<string>;
-  toggle: (path: string) => void;
-}) {
-  const isOpen = open.has(node.path);
-  const FolderIcon = isOpen ? FolderOpen : Folder;
+function FolderRow({ folder, depth, ctx }: { folder: Folder; depth: number; ctx: TreeCtx }) {
+  const isOpen = ctx.open.has(folder.folder_id);
+  const Icon = isOpen ? FolderOpen : FolderIcon;
+  const childFolders = ctx.foldersByParent.get(folder.folder_id) ?? [];
+  const childFiles = ctx.assetsByFolder.get(folder.folder_id) ?? [];
+  const canShare = ctx.isAdmin || (!!folder.owner_id && folder.owner_id === ctx.viewerId);
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => toggle(node.path)}
-        aria-expanded={isOpen}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/60"
+      <div
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60"
         style={{ paddingLeft: depth * INDENT + 8 }}
       >
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-90")}
-          aria-hidden
-        />
-        <FolderIcon className="size-4 shrink-0 text-primary" aria-hidden />
-        <span className="truncate font-medium">{node.name}</span>
-        <Badge variant="muted" className="ml-auto shrink-0">
-          {node.count}
-        </Badge>
-      </button>
-      {isOpen && <TreeLevel folders={node.folders} files={node.files} depth={depth + 1} open={open} toggle={toggle} />}
-    </div>
-  );
-}
-
-function TreeLevel({
-  folders,
-  files,
-  depth,
-  open,
-  toggle,
-}: {
-  folders: TreeNode[];
-  files: Asset[];
-  depth: number;
-  open: Set<string>;
-  toggle: (path: string) => void;
-}) {
-  return (
-    <div className="flex flex-col">
-      {folders.map((f) => (
-        <FolderRow key={f.path} node={f} depth={depth} open={open} toggle={toggle} />
-      ))}
-      {files.map((a) => (
-        <FileRow key={a.asset_id} asset={a} depth={depth} />
-      ))}
+        <button
+          type="button"
+          onClick={() => ctx.toggle(folder.folder_id)}
+          aria-expanded={isOpen}
+          className="flex flex-1 items-center gap-2 text-left"
+        >
+          <ChevronRight
+            className={cn("size-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-90")}
+            aria-hidden
+          />
+          <Icon className="size-4 shrink-0 text-primary" aria-hidden />
+          <span className="truncate font-medium">{folder.name}</span>
+          <Badge variant="muted" className="shrink-0">
+            {ctx.countFor(folder.folder_id)}
+          </Badge>
+        </button>
+        {canShare && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6"
+            aria-label={`Share folder ${folder.name}`}
+            onClick={() => ctx.onShareFolder(folder)}
+          >
+            <Share2 className="size-3.5" />
+          </Button>
+        )}
+      </div>
+      {isOpen && (
+        <div className="flex flex-col">
+          {childFolders.map((f) => (
+            <FolderRow key={f.folder_id} folder={f} depth={depth + 1} ctx={ctx} />
+          ))}
+          {childFiles.map((a) => (
+            <FileRow key={a.asset_id} asset={a} depth={depth + 1} ctx={ctx} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export function AssetTree({
   assets,
-  viewerId = null,
-  isAdmin = false,
-  onShare,
+  folders,
+  viewerId,
+  isAdmin,
+  onShareAsset,
+  onShareFolder,
+  onMoveAsset,
 }: {
   assets: Asset[];
-  viewerId?: string | null;
-  isAdmin?: boolean;
-  onShare?: (asset: Asset) => void;
+  folders: Folder[];
+  viewerId: string | null;
+  isAdmin: boolean;
+  onShareAsset: (a: Asset) => void;
+  onShareFolder: (f: Folder) => void;
+  onMoveAsset: (a: Asset, folderId: string | null) => void;
 }) {
-  const [mode, setMode] = useState<ViewMode>("type");
-  const tree = useMemo(() => buildTree(assets, mode), [assets, mode]);
+  const foldersByParent = useMemo(() => {
+    const map = new Map<string | null, Folder[]>();
+    for (const f of folders) {
+      const key = f.parent_id ?? null;
+      const arr = map.get(key);
+      if (arr) arr.push(f);
+      else map.set(key, [f]);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
+    return map;
+  }, [folders]);
+
+  const assetsByFolder = useMemo(() => {
+    const map = new Map<string | null, Asset[]>();
+    for (const a of assets) {
+      const key = a.folder_id ?? null;
+      const arr = map.get(key);
+      if (arr) arr.push(a);
+      else map.set(key, [a]);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => displayName(a).localeCompare(displayName(b)));
+    return map;
+  }, [assets]);
+
+  const folderOptions = useMemo(() => [...folders].sort((a, b) => a.name.localeCompare(b.name)), [folders]);
+
+  const countFor = useMemo(() => {
+    const fn = (folderId: string): number => {
+      const direct = (assetsByFolder.get(folderId) ?? []).length;
+      const kids = (foldersByParent.get(folderId) ?? []).reduce((s, f) => s + fn(f.folder_id), 0);
+      return direct + kids;
+    };
+    return fn;
+  }, [assetsByFolder, foldersByParent]);
+
+  // Default every folder expanded so nested files are visible; re-default whenever the
+  // folder set changes (e.g. after creating a folder or moving a file).
   const [open, setOpen] = useState<Set<string>>(new Set());
-
-  // Default to top-level folders expanded; re-default whenever the grouping (and thus
-  // the folder set) changes so a fresh view never opens fully collapsed.
   useEffect(() => {
-    setOpen(new Set(tree.folders.map((f) => f.path)));
-  }, [tree]);
+    setOpen(new Set(folders.map((f) => f.folder_id)));
+  }, [folders]);
 
-  const toggle = (path: string) =>
+  const toggle = (id: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
+  const ctx: TreeCtx = {
+    viewerId,
+    isAdmin,
+    foldersByParent,
+    assetsByFolder,
+    folderOptions,
+    open,
+    toggle,
+    countFor,
+    onShareAsset,
+    onShareFolder,
+    onMoveAsset,
+  };
+
+  const rootFolders = foldersByParent.get(null) ?? [];
+  const rootFiles = assetsByFolder.get(null) ?? [];
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Group by</span>
-        <div className="inline-flex gap-1 rounded-lg border border-border p-1">
-          {MODES.map((m) => (
-            <Button
-              key={m.value}
-              type="button"
-              size="sm"
-              variant={mode === m.value ? "secondary" : "ghost"}
-              aria-pressed={mode === m.value}
-              onClick={() => setMode(m.value)}
-            >
-              {m.label}
-            </Button>
-          ))}
-        </div>
+    <div className="rounded-lg border border-border bg-card/40 p-1.5">
+      <div className="flex flex-col">
+        {rootFolders.map((f) => (
+          <FolderRow key={f.folder_id} folder={f} depth={0} ctx={ctx} />
+        ))}
+        {rootFiles.map((a) => (
+          <FileRow key={a.asset_id} asset={a} depth={0} ctx={ctx} />
+        ))}
       </div>
-      <OwnerContext.Provider value={{ viewerId, isAdmin, onShare }}>
-        <div className="rounded-lg border border-border bg-card/40 p-1.5">
-          <TreeLevel folders={tree.folders} files={tree.files} depth={0} open={open} toggle={toggle} />
-        </div>
-      </OwnerContext.Provider>
     </div>
   );
 }

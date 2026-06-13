@@ -16,9 +16,19 @@ class StoredAsset(BaseModel):
     updated: datetime | None = None
 
 
-class AssetMetadata(BaseModel):
-    """A catalogued asset: its storage location plus descriptive metadata. This is
-    the first domain record managed via the DatabaseManager (AssetMetadataManager)."""
+class Shareable(BaseModel):
+    """Mixin of RBAC sharing fields used by both assets and folders. `owner_id` is the
+    pseudonymous uploader (None = legacy/unowned, visible to all); `shared_user_ids` and
+    `shared_group_ids` are the principals granted access. Admins see everything."""
+
+    owner_id: str | None = None
+    shared_user_ids: list[str] = Field(default_factory=list)
+    shared_group_ids: list[str] = Field(default_factory=list)
+
+
+class AssetMetadata(Shareable):
+    """A catalogued asset: its storage location plus descriptive metadata. The first domain
+    record managed via the DatabaseManager (AssetMetadataManager)."""
 
     asset_id: str
     storage_key: str
@@ -27,12 +37,30 @@ class AssetMetadata(BaseModel):
     size_bytes: int | None = None
     created_at: datetime
     updated_at: datetime
-    # RBAC: the pseudonymous user_id of the uploader (None = legacy/unowned, visible to all),
-    # and the user_ids it has been shared with. Admins see every asset regardless.
-    owner_id: str | None = None
-    shared_with: list[str] = Field(default_factory=list)
+    # The folder the asset lives in (None = root). Files inherit their folder's sharing.
+    folder_id: str | None = None
     # Arbitrary, app-defined key/values. Kept generic on purpose.
     tags: dict[str, str] = Field(default_factory=dict)
+
+
+class Folder(Shareable):
+    """A real (named) folder in the Asset Manager. Folders nest via parent_id and carry
+    their own sharing; contained assets (and sub-folders) inherit folder access."""
+
+    folder_id: str
+    name: str
+    parent_id: str | None = None
+    created_at: datetime
+
+
+class Group(BaseModel):
+    """A custom group of users (admin-managed). Assets/folders can be shared with a group;
+    a member then inherits that access. member_ids are pseudonymous user_ids."""
+
+    group_id: str
+    name: str
+    member_ids: list[str] = Field(default_factory=list)
+    created_at: datetime
 
 
 class SignedUrlResponse(BaseModel):

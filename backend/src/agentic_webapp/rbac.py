@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .identity import mask_user_id
+
 # Gateable areas — keep in sync with the SPA routes/nav.
 AREAS: tuple[str, ...] = ("home", "chat", "sessions", "assets", "analytics", "admin")
 
@@ -65,3 +67,15 @@ def permissions_for(roles: list[str]) -> list[str]:
 def personas(environment: str) -> list[dict[str, Any]]:
     """Test personas to expose to the SPA — only in non-prod."""
     return [] if environment == "prod" else PERSONAS
+
+
+def directory(*, user_roles: dict[str, list[str]] | None = None) -> dict[str, dict[str, str]]:
+    """A pseudonymous-id -> {email, name} lookup so the SPA can show human names for the
+    user_ids that appear on shared assets/folders. Built from the test PERSONAS (known
+    name+email) plus any configured prod user_roles (email only, used as the name too)."""
+    result: dict[str, dict[str, str]] = {
+        mask_user_id(p["email"]): {"email": p["email"], "name": p["name"]} for p in PERSONAS
+    }
+    for email in user_roles or {}:
+        result[mask_user_id(email)] = {"email": email, "name": email}
+    return result

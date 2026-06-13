@@ -17,6 +17,8 @@ from agentic_core.database import (
     BigQueryDatabaseManager,
     DatabaseManager,
     FirestoreDatabaseManager,
+    FolderManager,
+    GroupManager,
     InMemoryDatabaseManager,
     LlmUsageManager,
 )
@@ -59,6 +61,16 @@ def get_database() -> DatabaseManager:
 @lru_cache
 def get_asset_metadata_manager() -> AssetMetadataManager:
     return AssetMetadataManager(get_database(), table=get_settings().asset_metadata_table)
+
+
+@lru_cache
+def get_folder_manager() -> FolderManager:
+    return FolderManager(get_database())
+
+
+@lru_cache
+def get_group_manager() -> GroupManager:
+    return GroupManager(get_database())
 
 
 @lru_cache

@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { App } from "./App";
 import { AuthProvider, RequireArea } from "./components/auth";
 import { Admin } from "./pages/Admin";
+import { AdminGroups } from "./pages/AdminGroups";
 import { AdminSessionRaw } from "./pages/AdminSessionRaw";
 import { AdminUser } from "./pages/AdminUser";
 import { Analytics } from "./pages/Analytics";
@@ -41,6 +42,14 @@ createRoot(rootElement).render(
               element={
                 <RequireArea area="admin">
                   <Admin />
+                </RequireArea>
+              }
+            />
+            <Route
+              path="/admin/groups"
+              element={
+                <RequireArea area="admin">
+                  <AdminGroups />
                 </RequireArea>
               }
             />

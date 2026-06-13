@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchUsage, fetchUsers, type UsageSummary, type UserSummary } from "../api";
@@ -45,8 +46,11 @@ export function Admin() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between gap-2">
           <CardTitle>Users</CardTitle>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin/groups">Manage groups</Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <Table>
@@ -70,13 +74,26 @@ export function Admin() {
               {users.map((u) => (
                 <TableRow key={u.user_id}>
                   <TableCell>
-                    {/* drill into a single user's sessions */}
-                    <Link
-                      className="text-secondary-foreground hover:underline"
-                      to={`/admin/users/${encodeURIComponent(u.user_id)}`}
-                    >
-                      {u.user_id}
-                    </Link>
+                    {/* drill into a single user's sessions; show the conventional identity when known */}
+                    {u.name || u.email ? (
+                      <div className="flex flex-col">
+                        {u.name && <span className="font-medium">{u.name}</span>}
+                        {u.email && <span className="text-xs text-muted-foreground">{u.email}</span>}
+                        <Link
+                          className="font-mono text-xs text-muted-foreground hover:underline"
+                          to={`/admin/users/${encodeURIComponent(u.user_id)}`}
+                        >
+                          {u.user_id}
+                        </Link>
+                      </div>
+                    ) : (
+                      <Link
+                        className="text-secondary-foreground hover:underline"
+                        to={`/admin/users/${encodeURIComponent(u.user_id)}`}
+                      >
+                        {u.user_id}
+                      </Link>
+                    )}
                   </TableCell>
                   <TableCell>{u.sessions}</TableCell>
                   <TableCell>{u.calls}</TableCell>

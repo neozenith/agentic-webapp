@@ -54,7 +54,9 @@ class AssetMetadataManager:
             "created_at": meta.created_at.isoformat(),
             "updated_at": meta.updated_at.isoformat(),
             "owner_id": meta.owner_id,
-            "shared_with_json": json.dumps(meta.shared_with or []),
+            "folder_id": meta.folder_id,
+            "shared_user_ids_json": json.dumps(meta.shared_user_ids or []),
+            "shared_group_ids_json": json.dumps(meta.shared_group_ids or []),
             # Nested tags are flattened to a JSON string so the table schema stays
             # simple and portable across backends.
             "metadata_json": json.dumps(meta.tags or {}),
@@ -62,10 +64,12 @@ class AssetMetadataManager:
 
     @staticmethod
     def _from_row(row: Row) -> AssetMetadata:
+        def _arr(key: str) -> list[str]:
+            raw = row.get(key)
+            return json.loads(raw) if isinstance(raw, str) and raw else (raw or [])
+
         raw_tags = row.get("metadata_json")
         tags = json.loads(raw_tags) if isinstance(raw_tags, str) and raw_tags else (raw_tags or {})
-        raw_shared = row.get("shared_with_json")
-        shared = json.loads(raw_shared) if isinstance(raw_shared, str) and raw_shared else (raw_shared or [])
         return AssetMetadata(
             asset_id=row["asset_id"],
             storage_key=row["storage_key"],
@@ -75,6 +79,8 @@ class AssetMetadataManager:
             created_at=row["created_at"],  # pydantic coerces str|datetime
             updated_at=row["updated_at"],
             owner_id=row.get("owner_id"),
-            shared_with=shared,
+            folder_id=row.get("folder_id"),
+            shared_user_ids=_arr("shared_user_ids_json"),
+            shared_group_ids=_arr("shared_group_ids_json"),
             tags=tags,
         )

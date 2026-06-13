@@ -32,7 +32,9 @@ def test_owner_only_visibility_then_sharing(client):
     assert client.get(f"/api/assets/{aid}/content", headers=NINA).status_code == 200
 
     # owner shares with vera -> she can now see and fetch it
-    share = client.post(f"/api/assets/{aid}/share", json={"emails": ["vera.viewer@example.com"]}, headers=NINA)
+    share = client.post(
+        f"/api/assets/{aid}/share", json={"add_user_emails": ["vera.viewer@example.com"]}, headers=NINA
+    )
     assert share.status_code == 200
     assert aid in _ids(client, VERA)
     assert client.get(f"/api/assets/{aid}/content", headers=VERA).status_code == 200
@@ -41,7 +43,9 @@ def test_owner_only_visibility_then_sharing(client):
 def test_only_owner_or_admin_may_share_or_delete(client):
     aid = _upload(client, NINA)
     # a non-owner, non-admin may not share or delete
-    assert client.post(f"/api/assets/{aid}/share", json={"emails": ["x@y.com"]}, headers=VERA).status_code == 403
+    assert (
+        client.post(f"/api/assets/{aid}/share", json={"add_user_emails": ["x@y.com"]}, headers=VERA).status_code == 403
+    )
     assert client.delete(f"/api/assets/{aid}", headers=VERA).status_code == 403
     # admin may delete anyone's asset
     assert client.delete(f"/api/assets/{aid}", headers=ADA).status_code == 204

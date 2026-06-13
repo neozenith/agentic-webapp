@@ -181,17 +181,130 @@ export interface Asset {
   size_bytes: number | null;
   created_at: string;
   owner_id?: string | null;
-  shared_with?: string[];
+  folder_id?: string | null;
+  shared_user_ids?: string[];
+  shared_group_ids?: string[];
 }
 
-/** Share an asset with other users (by email). Owner or admin only (server-enforced). */
-export async function shareAsset(assetId: string, emails: string[]): Promise<Asset> {
+export interface Folder {
+  folder_id: string;
+  name: string;
+  parent_id?: string | null;
+  owner_id?: string | null;
+  shared_user_ids?: string[];
+  shared_group_ids?: string[];
+  created_at: string;
+}
+
+export interface Group {
+  group_id: string;
+  name: string;
+  member_ids: string[];
+  created_at: string;
+}
+
+/** A change-set for sharing a file OR folder with users (by email) and/or groups. */
+export interface ShareEdit {
+  add_user_emails?: string[];
+  remove_user_ids?: string[];
+  add_group_ids?: string[];
+  remove_group_ids?: string[];
+}
+
+export async function shareAsset(assetId: string, edit: ShareEdit): Promise<Asset> {
   const resp = await apiFetch(`/api/assets/${assetId}/share`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ emails }),
+    body: JSON.stringify(edit),
   });
   if (!resp.ok) throw new Error(`share error ${resp.status}`);
+  return resp.json();
+}
+
+/** Move a file into a folder (null = root). Owner or admin only (server-enforced). */
+export async function moveAsset(assetId: string, folderId: string | null): Promise<Asset> {
+  const resp = await apiFetch(`/api/assets/${assetId}/move`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ folder_id: folderId }),
+  });
+  if (!resp.ok) throw new Error(`move error ${resp.status}`);
+  return resp.json();
+}
+
+// --- Folders ---
+export async function listFolders(): Promise<Folder[]> {
+  const resp = await apiFetch("/api/folders");
+  if (!resp.ok) throw new Error(`folders error ${resp.status}`);
+  return resp.json();
+}
+
+export async function createFolder(name: string, parentId: string | null = null): Promise<Folder> {
+  const resp = await apiFetch("/api/folders", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, parent_id: parentId }),
+  });
+  if (!resp.ok) throw new Error(`create folder error ${resp.status}`);
+  return resp.json();
+}
+
+export async function deleteFolder(folderId: string): Promise<void> {
+  const resp = await apiFetch(`/api/folders/${folderId}`, { method: "DELETE" });
+  if (!resp.ok && resp.status !== 204) throw new Error(`delete folder error ${resp.status}`);
+}
+
+export async function shareFolder(folderId: string, edit: ShareEdit): Promise<Folder> {
+  const resp = await apiFetch(`/api/folders/${folderId}/share`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+  if (!resp.ok) throw new Error(`share folder error ${resp.status}`);
+  return resp.json();
+}
+
+// --- Groups (admin) ---
+export async function listGroups(): Promise<Group[]> {
+  const resp = await apiFetch("/api/admin/groups");
+  if (!resp.ok) throw new Error(`groups error ${resp.status}`);
+  return resp.json();
+}
+
+export async function createGroup(name: string, memberEmails: string[] = []): Promise<Group> {
+  const resp = await apiFetch("/api/admin/groups", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, member_emails: memberEmails }),
+  });
+  if (!resp.ok) throw new Error(`create group error ${resp.status}`);
+  return resp.json();
+}
+
+export async function updateGroup(
+  groupId: string,
+  edit: { name?: string; add_member_emails?: string[]; remove_member_ids?: string[] },
+): Promise<Group> {
+  const resp = await apiFetch(`/api/admin/groups/${groupId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+  if (!resp.ok) throw new Error(`update group error ${resp.status}`);
+  return resp.json();
+}
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  const resp = await apiFetch(`/api/admin/groups/${groupId}`, { method: "DELETE" });
+  if (!resp.ok && resp.status !== 204) throw new Error(`delete group error ${resp.status}`);
+}
+
+// --- Directory: pseudonymous user_id -> conventional name/email (known identities) ---
+export type Directory = Record<string, { email: string; name: string }>;
+
+export async function fetchDirectory(): Promise<Directory> {
+  const resp = await apiFetch("/api/directory");
+  if (!resp.ok) throw new Error(`directory error ${resp.status}`);
   return resp.json();
 }
 
@@ -235,6 +348,9 @@ export interface UserSummary {
   calls: number;
   total_tokens: number;
   est_cost_usd: number;
+  // Conventional identity from the directory (when the user_id is a known persona/IAP user).
+  email?: string | null;
+  name?: string | null;
 }
 
 export interface SessionSummary {

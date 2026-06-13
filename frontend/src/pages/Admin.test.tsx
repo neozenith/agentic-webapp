@@ -21,15 +21,27 @@ describe("Admin overview", () => {
       http.get("/api/admin/usage", () => HttpResponse.json(totals)),
       http.get("/api/admin/users", () =>
         HttpResponse.json([
-          { user_id: "alice@example.com", sessions: 2, calls: 3, total_tokens: 200, est_cost_usd: 0.001 },
+          {
+            user_id: "alice@example.com",
+            sessions: 2,
+            calls: 3,
+            total_tokens: 200,
+            est_cost_usd: 0.001,
+            name: "Alice Smith",
+            email: "alice@corp.example",
+          },
           { user_id: "bob@example.com", sessions: 1, calls: 2, total_tokens: 100, est_cost_usd: 0.0002 },
         ]),
       ),
     );
     renderAdmin();
     expect(await screen.findByText("$0.001234")).toBeInTheDocument(); // totals stat
-    const alice = await screen.findByRole("link", { name: "alice@example.com" });
+    // Known identity: name + email render alongside the (still clickable) pseudonymous user_id.
+    expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
+    expect(screen.getByText("alice@corp.example")).toBeInTheDocument();
+    const alice = screen.getByRole("link", { name: "alice@example.com" });
     expect(alice).toHaveAttribute("href", "/admin/users/alice%40example.com");
+    // Unknown identity: falls back to just the user_id link.
     expect(screen.getByRole("link", { name: "bob@example.com" })).toBeInTheDocument();
   });
 

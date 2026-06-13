@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import rbac
 from .api.auth import iap_email, require_area
-from .api.routes import admin, agent, analytics, assets, health
+from .api.routes import admin, agent, analytics, assets, folders, health
 from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
@@ -38,6 +38,7 @@ def create_app() -> FastAPI:
     # Backend APIs.
     app.include_router(health.router)
     app.include_router(assets.router)
+    app.include_router(folders.router)
     # Sensitive areas are enforced server-side (defense-in-depth behind the SPA gating).
     app.include_router(admin.router, dependencies=[Depends(require_area("admin"))])
     app.include_router(analytics.router, dependencies=[Depends(require_area("analytics"))])
@@ -65,6 +66,12 @@ def create_app() -> FastAPI:
     async def personas() -> list[dict[str, Any]]:
         """Switchable test identities (non-prod only) so RBAC mappings can be exercised."""
         return rbac.personas(settings.environment)
+
+    @app.get("/api/directory")
+    async def directory() -> dict[str, dict[str, str]]:
+        """Pseudonymous-id -> {email, name} lookup so the SPA can render human names for the
+        user_ids on shared assets/folders. Any signed-in user may read it."""
+        return rbac.directory(user_roles=settings.rbac_user_roles)
 
     _mount_frontend(app, settings)
     return app

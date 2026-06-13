@@ -26,10 +26,46 @@ resource "google_bigquery_table" "asset_metadata" {
     { name = "size_bytes", type = "INTEGER", mode = "NULLABLE" },
     { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
     { name = "updated_at", type = "TIMESTAMP", mode = "NULLABLE" },
-    # RBAC: pseudonymous owner + JSON array of user_ids the asset is shared with.
+    # RBAC: pseudonymous owner, the folder it lives in (inherits the folder's sharing), and
+    # JSON arrays of the user_ids / group_ids the asset is directly shared with.
     { name = "owner_id", type = "STRING", mode = "NULLABLE" },
-    { name = "shared_with_json", type = "STRING", mode = "NULLABLE" },
+    { name = "folder_id", type = "STRING", mode = "NULLABLE" },
+    { name = "shared_user_ids_json", type = "STRING", mode = "NULLABLE" },
+    { name = "shared_group_ids_json", type = "STRING", mode = "NULLABLE" },
     { name = "metadata_json", type = "STRING", mode = "NULLABLE" },
+  ])
+}
+
+# Real named folders for the Asset Manager (managed via FolderManager). Folders nest via
+# parent_id and carry their own sharing; contained assets + sub-folders inherit that access.
+resource "google_bigquery_table" "folders" {
+  dataset_id          = google_bigquery_dataset.app.dataset_id
+  table_id            = "folders"
+  deletion_protection = var.environment == "prod"
+
+  schema = jsonencode([
+    { name = "folder_id", type = "STRING", mode = "REQUIRED" },
+    { name = "name", type = "STRING", mode = "NULLABLE" },
+    { name = "parent_id", type = "STRING", mode = "NULLABLE" },
+    { name = "owner_id", type = "STRING", mode = "NULLABLE" },
+    { name = "shared_user_ids_json", type = "STRING", mode = "NULLABLE" },
+    { name = "shared_group_ids_json", type = "STRING", mode = "NULLABLE" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
+# Custom user groups (admin-managed, via GroupManager). Assets/folders can be shared with a
+# group; a member then inherits that access. member_ids are pseudonymous user_ids.
+resource "google_bigquery_table" "groups" {
+  dataset_id          = google_bigquery_dataset.app.dataset_id
+  table_id            = "groups"
+  deletion_protection = var.environment == "prod"
+
+  schema = jsonencode([
+    { name = "group_id", type = "STRING", mode = "REQUIRED" },
+    { name = "name", type = "STRING", mode = "NULLABLE" },
+    { name = "member_ids_json", type = "STRING", mode = "NULLABLE" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
   ])
 }
 
