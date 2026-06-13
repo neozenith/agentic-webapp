@@ -6,15 +6,21 @@ import { describe, expect, it, vi } from "vitest";
 import { server } from "../test/server";
 import { PermissionsDialog, type ShareTarget } from "./PermissionsDialog";
 
-const DIRECTORY = { u1: { email: "alice@example.com", name: "Alice" } };
+// u1/Alice is already shared on the target (so excluded from suggestions); u2/Carol is an
+// unshared directory identity, so she surfaces as a live suggestion.
+const DIRECTORY = {
+  u1: { email: "alice@example.com", name: "Alice" },
+  u2: { email: "carol@example.com", name: "Carol" },
+};
+// The public /api/groups picker returns id + name only (no membership).
 const GROUPS = [
-  { group_id: "g1", name: "Engineering", member_ids: [], created_at: "2026-06-01T00:00:00Z" },
-  { group_id: "g2", name: "Finance", member_ids: [], created_at: "2026-06-01T00:00:00Z" },
+  { group_id: "g1", name: "Engineering" },
+  { group_id: "g2", name: "Finance" },
 ];
 
 const directoryAndGroups = () => [
   http.get("/api/directory", () => HttpResponse.json(DIRECTORY)),
-  http.get("/api/admin/groups", () => HttpResponse.json(GROUPS)),
+  http.get("/api/groups", () => HttpResponse.json(GROUPS)),
 ];
 
 const target: ShareTarget = {
@@ -35,7 +41,7 @@ describe("PermissionsDialog", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("loads current users/groups, adds an email, and POSTs add_user_emails on save", async () => {
+  it("adds an arbitrary email via free-text and POSTs add_user_emails on save", async () => {
     server.use(...directoryAndGroups());
     let body: unknown = null;
     server.use(
@@ -53,8 +59,10 @@ describe("PermissionsDialog", () => {
     expect(await screen.findByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Engineering")).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("Add by email"), "bob@example.com");
-    await user.click(screen.getByRole("button", { name: "Add email" }));
+    // bob is not in the directory — typing + Enter adds the raw email.
+    const input = screen.getByRole("combobox", { name: "Add by name or email" });
+    await user.type(input, "bob@example.com");
+    await user.keyboard("{Enter}");
     expect(screen.getByText("bob@example.com")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -63,7 +71,42 @@ describe("PermissionsDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("removes a user + group and adds a group, sending the full change-set (folder kind)", async () => {
+  it("filters user suggestions live and adds the picked directory user by email", async () => {
+    server.use(...directoryAndGroups());
+    let body: unknown = null;
+    server.use(
+      http.post("/api/assets/a1/share", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ asset_id: "a1" });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PermissionsDialog open onOpenChange={() => {}} target={target} onSaved={() => {}} />);
+    await screen.findByText("Alice");
+
+    const input = screen.getByRole("combobox", { name: "Add by name or email" });
+    await user.click(input);
+    // Carol (unshared) is suggested; Alice (already shared) is not offered again.
+    expect(screen.getByRole("option", { name: /Carol/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Alice/ })).not.toBeInTheDocument();
+
+    // Typing narrows the list live.
+    await user.type(input, "zzz");
+    expect(screen.queryByRole("option", { name: /Carol/ })).not.toBeInTheDocument();
+    await user.clear(input);
+    await user.type(input, "car");
+    const carol = screen.getByRole("option", { name: /Carol/ });
+    expect(carol).toBeInTheDocument();
+
+    await user.click(carol);
+    expect(screen.getByText("carol@example.com")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toEqual({ add_user_emails: ["carol@example.com"] });
+  });
+
+  it("removes a user + group and adds a group via the combobox (folder kind)", async () => {
     server.use(...directoryAndGroups());
     let body: unknown = null;
     server.use(
@@ -86,8 +129,13 @@ describe("PermissionsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Remove Alice" }));
     expect(screen.queryByText("Alice")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove group Engineering" }));
-    // g2 (Finance) is the only addable group; pick it.
-    await user.click(screen.getByLabelText("Finance"));
+
+    // g2 (Finance) is the only addable group — filter to it and pick it.
+    const groupInput = screen.getByRole("combobox", { name: "Add a group" });
+    await user.type(groupInput, "Fin");
+    await user.click(screen.getByRole("option", { name: "Finance" }));
+    // The picked group shows as a pending "new" chip.
+    expect(screen.getByText("Finance")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(body).not.toBeNull());
@@ -99,8 +147,9 @@ describe("PermissionsDialog", () => {
     const user = userEvent.setup();
     render(<PermissionsDialog open onOpenChange={() => {}} target={target} onSaved={() => {}} />);
     await screen.findByText("Alice");
-    await user.type(screen.getByLabelText("Add by email"), "bob@example.com");
-    await user.click(screen.getByRole("button", { name: "Add email" }));
+    const input = screen.getByRole("combobox", { name: "Add by name or email" });
+    await user.type(input, "bob@example.com");
+    await user.keyboard("{Enter}");
     expect(screen.getByText("bob@example.com")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove bob@example.com" }));
     expect(screen.queryByText("bob@example.com")).not.toBeInTheDocument();
@@ -117,7 +166,7 @@ describe("PermissionsDialog", () => {
   it("surfaces a load error when the directory fetch fails", async () => {
     server.use(
       http.get("/api/directory", () => new HttpResponse(null, { status: 500 })),
-      http.get("/api/admin/groups", () => HttpResponse.json(GROUPS)),
+      http.get("/api/groups", () => HttpResponse.json(GROUPS)),
     );
     render(<PermissionsDialog open onOpenChange={() => {}} target={target} onSaved={() => {}} />);
     expect(await screen.findByText(/directory error 500/i)).toBeInTheDocument();

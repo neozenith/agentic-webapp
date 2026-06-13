@@ -297,6 +297,23 @@ export async function shareFolder(folderId: string, edit: ShareEdit): Promise<Fo
   return resp.json();
 }
 
+// --- Groups: shareable listing (top-level, any signed-in user) vs admin CRUD ---
+
+/** A group as exposed by the public /api/groups picker route: id + name only, NO membership. */
+export interface ShareableGroup {
+  group_id: string;
+  name: string;
+}
+
+/** List groups any signed-in user may share with (group_id + name only). Unlike listGroups
+ * (admin-only, includes membership), this hits the top-level read-only /api/groups route so
+ * non-admins can still discover groups in the sharing modal. */
+export async function listShareableGroups(): Promise<ShareableGroup[]> {
+  const resp = await apiFetch("/api/groups");
+  if (!resp.ok) throw new Error(`groups error ${resp.status}`);
+  return resp.json();
+}
+
 // --- Groups (admin) ---
 export async function listGroups(): Promise<Group[]> {
   const resp = await apiFetch("/api/admin/groups");

@@ -6,7 +6,7 @@
   "scripts": {
     "test": "playwright test",
     "report": "playwright show-report",
-    "install-browser": "playwright install chromium"
+    "install-browser": "playwright install chromium webkit"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"

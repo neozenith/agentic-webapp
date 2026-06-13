@@ -6,14 +6,16 @@ In container:  uvicorn agentic_webapp.main:app --host 0.0.0.0 --port $PORT
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
+from agentic_core.database import GroupManager
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import rbac
 from .api.auth import iap_email, require_area
+from .api.deps import get_group_manager
 from .api.routes import admin, agent, analytics, assets, folders, health
 from .config import Settings, get_settings
 from .identity import mask_user_id
@@ -72,6 +74,12 @@ def create_app() -> FastAPI:
         """Pseudonymous-id -> {email, name} lookup so the SPA can render human names for the
         user_ids on shared assets/folders. Any signed-in user may read it."""
         return rbac.directory(user_roles=settings.rbac_user_roles)
+
+    @app.get("/api/groups")
+    async def groups(manager: Annotated[GroupManager, Depends(get_group_manager)]) -> list[dict[str, str]]:
+        """Read-only group listing (group_id + name, NO membership) so any signed-in user can
+        discover groups to share with. Membership and CRUD stay admin-only (/api/admin/groups)."""
+        return [{"group_id": g.group_id, "name": g.name} for g in await manager.list()]
 
     _mount_frontend(app, settings)
     return app
