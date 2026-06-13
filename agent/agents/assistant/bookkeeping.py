@@ -30,6 +30,38 @@ _MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash-lite")
 _USAGE = LlmUsageManager(build_database_from_env(), table=os.environ.get("LLM_USAGE_TABLE", "llm_usage"))
 
 
+async def record_llm_call(
+    *,
+    user_id: str,
+    session_id: str,
+    prompt_tokens: int,
+    output_tokens: int,
+    app_name: str = "assistant",
+    model_id: str | None = None,
+) -> None:
+    """Record one LLM call that did NOT come through the agent's model loop (e.g. the
+    background session summariser), so auxiliary calls are still itemised against the
+    session in the same bookkeeping inventory. Never raises."""
+    model = model_id or _MODEL
+    total = (prompt_tokens or 0) + (output_tokens or 0)
+    record = LlmUsageRecord(
+        request_id=f"{app_name}:{uuid4().hex[:8]}",
+        app_name=app_name,
+        user_id=user_id or "anonymous",
+        session_id=session_id or "unknown",
+        model_id=model,
+        prompt_tokens=prompt_tokens or 0,
+        output_tokens=output_tokens or 0,
+        total_tokens=total,
+        est_cost_usd=estimate_cost_usd(model, prompt_tokens or 0, output_tokens or 0),
+        timestamp=datetime.now(timezone.utc),
+    )
+    try:
+        await _USAGE.record(record)
+    except Exception:  # noqa: BLE001 — auxiliary write; never break the caller  # pragma: no cover — defensive
+        log.exception("failed to record %s usage", app_name)
+
+
 async def record_usage(callback_context: Any, llm_response: Any) -> None:  # ADK callback signature (untyped)
     """Record one model call's token usage + estimated cost. Returns None so ADK
     keeps the original response. Never raises — bookkeeping must not break a reply."""

@@ -16,21 +16,30 @@ const renderSessions = () =>
   );
 
 describe("Sessions", () => {
-  it("lists the user's sessions, most-recent first, each linking to its chat", async () => {
+  it("lists sessions most-recent first, labelled by their summariser title", async () => {
     server.use(
       me,
       http.get("/apps/assistant/users/uid/sessions", () =>
         HttpResponse.json([
-          { id: "older", lastUpdateTime: 1000 },
-          { id: "newer", lastUpdateTime: 2000 },
+          { id: "older", lastUpdateTime: 1000, state: { title: "Older chat" } },
+          { id: "newer", lastUpdateTime: 2000, state: { title: "Fuel receipt analysis" } },
         ]),
       ),
     );
     renderSessions();
-    expect(await screen.findByRole("link", { name: "newer" })).toHaveAttribute("href", "/chat/newer");
-    expect(screen.getByRole("link", { name: "older" })).toHaveAttribute("href", "/chat/older");
-    // header row + 2 session rows
-    expect(screen.getAllByRole("row")).toHaveLength(3);
+    // the title is the link text; it still navigates to /chat/<id>
+    expect(await screen.findByRole("link", { name: "Fuel receipt analysis" })).toHaveAttribute("href", "/chat/newer");
+    expect(screen.getByRole("link", { name: "Older chat" })).toHaveAttribute("href", "/chat/older");
+    expect(screen.getAllByRole("row")).toHaveLength(3); // header + 2
+  });
+
+  it("falls back to 'Untitled session' when a session has no title yet", async () => {
+    server.use(
+      me,
+      http.get("/apps/assistant/users/uid/sessions", () => HttpResponse.json([{ id: "s1", lastUpdateTime: 1000 }])),
+    );
+    renderSessions();
+    expect(await screen.findByRole("link", { name: "Untitled session" })).toHaveAttribute("href", "/chat/s1");
   });
 
   it("shows an empty state when there are no sessions", async () => {

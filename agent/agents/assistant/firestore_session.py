@@ -171,12 +171,15 @@ class FirestoreSessionService(BaseSessionService):
         sessions = []
         async for doc in query.stream():
             data = doc.to_dict() or {}
-            # Per the contract, listed sessions carry no events/state — metadata only.
+            # Listed sessions carry no events; we surface only "title" from state (the
+            # background summariser writes it) so the SPA can label sessions without N reads.
+            title = (data.get("state") or {}).get("title")
             sessions.append(
                 Session(
                     app_name=app_name,
                     user_id=data.get("user_id", user_id or ""),
                     id=data["id"],
+                    state={"title": title} if title else {},
                     last_update_time=data.get("last_update_time") or 0.0,
                 )
             )

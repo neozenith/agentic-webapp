@@ -7,7 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { type ChatMessage, createSession, getMe, getSession, runAgent, sessionToMessages, uploadAsset } from "../api";
+import {
+  type ChatMessage,
+  createSession,
+  getMe,
+  getSession,
+  runAgent,
+  sessionTitle,
+  sessionToMessages,
+  uploadAsset,
+} from "../api";
 
 interface Attached {
   asset_id: string;
@@ -49,6 +58,7 @@ export function Chat() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [title, setTitle] = useState<string | null>(null);
   const [attached, setAttached] = useState<Attached | null>(null);
   const [attaching, setAttaching] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -83,6 +93,7 @@ export function Chat() {
           return;
         }
         setMessages(sessionToMessages(session));
+        setTitle(sessionTitle(session));
         setLoading(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -129,6 +140,12 @@ export function Chat() {
     try {
       const reply = await runAgent(userId, sessionId, outgoing);
       setMessages((m) => [...m, { role: "assistant", text: reply || "(no reply)" }]);
+      // The summariser titles the session in the background after a reply; pick it up.
+      if (!title) {
+        getSession(userId, sessionId)
+          .then((s) => setTitle(sessionTitle(s)))
+          .catch(() => {});
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -151,7 +168,11 @@ export function Chat() {
   return (
     <Card className="flex min-h-[70vh] flex-col gap-4 p-5">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">{sessionId ? `session ${sessionId.slice(0, 8)}…` : "starting…"}</span>
+        <span className="text-muted-foreground">
+          {title ? <span className="font-medium text-foreground">{title}</span> : null}
+          {title && sessionId ? " · " : ""}
+          {sessionId ? `${sessionId.slice(0, 8)}…` : "starting…"}
+        </span>
         <Button type="button" variant="outline" size="sm" onClick={() => void newChat()} disabled={busy}>
           New chat
         </Button>

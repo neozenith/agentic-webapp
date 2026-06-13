@@ -25,6 +25,13 @@ interface AdkEvent {
 export interface AdkSession {
   id: string;
   events?: AdkEvent[];
+  // The background summariser writes a short title into the session state.
+  state?: { title?: string };
+}
+
+/** The human-friendly title the summariser gave a session, if any. */
+export function sessionTitle(session: AdkSession | null): string | null {
+  return session?.state?.title ?? null;
 }
 
 export interface ChatMessage {
@@ -110,6 +117,8 @@ export async function fetchUsage(): Promise<UsageSummary> {
 export interface SessionMeta {
   id: string;
   lastUpdateTime?: number;
+  // list_sessions surfaces only the title from session state (see firestore_session.py).
+  state?: { title?: string };
 }
 
 /** List the signed-in user's sessions, most-recent first. */

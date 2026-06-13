@@ -17,6 +17,7 @@ from google.adk.agents import Agent
 
 from .attachments import attach_referenced_assets
 from .bookkeeping import record_usage
+from .summarizer import summarize_session
 from .tools import attach_asset, list_assets, record_extraction
 
 MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash-lite")
@@ -51,4 +52,6 @@ root_agent = Agent(
     before_model_callback=attach_referenced_assets,
     # Itemise token usage + cost to the bookkeeping table after every model call.
     after_model_callback=record_usage,
+    # Background: give the session a short human-friendly title (a separate, tracked LLM call).
+    after_agent_callback=summarize_session,
 )

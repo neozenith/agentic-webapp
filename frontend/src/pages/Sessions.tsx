@@ -44,6 +44,7 @@ export function Sessions() {
             <TableHeader>
               <TableRow>
                 <TableHead>session</TableHead>
+                <TableHead>id</TableHead>
                 <TableHead>last updated</TableHead>
               </TableRow>
             </TableHeader>
@@ -51,10 +52,12 @@ export function Sessions() {
               {sessions.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell>
+                    {/* the summariser's short title, falling back to the id */}
                     <Link className="text-secondary-foreground hover:underline" to={`/chat/${s.id}`}>
-                      {s.id}
+                      {s.state?.title ?? "Untitled session"}
                     </Link>
                   </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{s.id.slice(0, 12)}…</TableCell>
                   <TableCell className="text-muted-foreground">
                     {s.lastUpdateTime ? new Date(s.lastUpdateTime * 1000).toLocaleString() : "—"}
                   </TableCell>
