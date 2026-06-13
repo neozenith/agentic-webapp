@@ -1,14 +1,14 @@
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import {
   type Directory,
   fetchDirectory,
-  type Group,
-  listGroups,
+  listShareableGroups,
+  type ShareableGroup,
   type ShareEdit,
   shareAsset,
   shareFolder,
@@ -35,12 +35,11 @@ interface PermissionsDialogProps {
  * and POSTs it to the asset or folder share endpoint. */
 export function PermissionsDialog({ open, onOpenChange, target, onSaved }: PermissionsDialogProps) {
   const [directory, setDirectory] = useState<Directory>({});
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<ShareableGroup[]>([]);
   const [removeUserIds, setRemoveUserIds] = useState<Set<string>>(new Set());
   const [removeGroupIds, setRemoveGroupIds] = useState<Set<string>>(new Set());
   const [pendingEmails, setPendingEmails] = useState<string[]>([]);
   const [pickedGroupIds, setPickedGroupIds] = useState<Set<string>>(new Set());
-  const [emailInput, setEmailInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -54,8 +53,7 @@ export function PermissionsDialog({ open, onOpenChange, target, onSaved }: Permi
     setRemoveGroupIds(new Set());
     setPendingEmails([]);
     setPickedGroupIds(new Set());
-    setEmailInput("");
-    Promise.all([fetchDirectory(), listGroups()])
+    Promise.all([fetchDirectory(), listShareableGroups()])
       .then(([dir, grps]) => {
         if (cancelled) return;
         setDirectory(dir);
@@ -83,23 +81,35 @@ export function PermissionsDialog({ open, onOpenChange, target, onSaved }: Permi
 
   const remainingUsers = target.sharedUserIds.filter((u) => !removeUserIds.has(u));
   const remainingGroups = target.sharedGroupIds.filter((g) => !removeGroupIds.has(g));
-  const availableGroups = groups.filter((g) => !target.sharedGroupIds.includes(g.group_id));
+  const groupName = (gid: string) => groups.find((g) => g.group_id === gid)?.name ?? gid;
 
-  const addEmail = () => {
-    const email = emailInput.trim();
-    if (!email) return;
-    if (!pendingEmails.includes(email)) setPendingEmails([...pendingEmails, email]);
-    setEmailInput("");
+  // Suggestions for the user combobox: every directory identity not already shared-with and
+  // not already queued — matchable by name or email, value carried as the email to add.
+  const sharedEmails = new Set(
+    remainingUsers.map((uid) => directory[uid]?.email).filter((e): e is string => Boolean(e)),
+  );
+  const userOptions: ComboboxOption[] = Object.values(directory)
+    .filter((u) => !sharedEmails.has(u.email) && !pendingEmails.includes(u.email))
+    .map((u) => ({ value: u.email, label: u.name, hint: u.email }));
+
+  // Suggestions for the group combobox: groups not already shared-with and not already queued.
+  const groupOptions: ComboboxOption[] = groups
+    .filter((g) => !target.sharedGroupIds.includes(g.group_id) && !pickedGroupIds.has(g.group_id))
+    .map((g) => ({ value: g.group_id, label: g.name }));
+
+  const addEmail = (raw: string) => {
+    const email = raw.trim();
+    if (email) setPendingEmails((prev) => (prev.includes(email) ? prev : [...prev, email]));
   };
+  const addGroup = (gid: string) => setPickedGroupIds((prev) => new Set(prev).add(gid));
 
   const removeUser = (uid: string) => setRemoveUserIds((prev) => new Set(prev).add(uid));
   const removeGroup = (gid: string) => setRemoveGroupIds((prev) => new Set(prev).add(gid));
   const removePending = (email: string) => setPendingEmails((prev) => prev.filter((e) => e !== email));
-  const toggleGroup = (gid: string) =>
+  const removePickedGroup = (gid: string) =>
     setPickedGroupIds((prev) => {
       const next = new Set(prev);
-      if (next.has(gid)) next.delete(gid);
-      else next.add(gid);
+      next.delete(gid);
       return next;
     });
 
@@ -195,42 +205,48 @@ export function PermissionsDialog({ open, onOpenChange, target, onSaved }: Permi
               ))}
             </ul>
           )}
-          <div className="flex items-center gap-2">
-            <Input
-              type="email"
-              placeholder="Add by email"
-              aria-label="Add by email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addEmail();
-                }
-              }}
-            />
-            <Button type="button" variant="secondary" size="sm" aria-label="Add email" onClick={addEmail}>
-              <Plus className="size-4" /> Add
-            </Button>
-          </div>
+          <Combobox
+            label="Add by name or email"
+            placeholder="Add by name or email"
+            options={userOptions}
+            onSelect={addEmail}
+            onFreeText={addEmail}
+            emptyText="No matching people — press Enter to add this email"
+          />
         </section>
 
         <section className="flex flex-col gap-2">
           <h3 className="text-sm font-medium">Groups with access</h3>
-          {remainingGroups.length === 0 ? (
+          {remainingGroups.length === 0 && pickedGroupIds.size === 0 ? (
             <p className="text-xs text-muted-foreground">No groups yet.</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {remainingGroups.map((gid) => (
                 <li key={gid} className="flex items-center gap-2 text-sm">
-                  <span className="truncate">{groups.find((g) => g.group_id === gid)?.name ?? gid}</span>
+                  <span className="truncate">{groupName(gid)}</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="ml-auto size-6"
-                    aria-label={`Remove group ${groups.find((g) => g.group_id === gid)?.name ?? gid}`}
+                    aria-label={`Remove group ${groupName(gid)}`}
                     onClick={() => removeGroup(gid)}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </li>
+              ))}
+              {[...pickedGroupIds].map((gid) => (
+                <li key={gid} className="flex items-center gap-2 text-sm">
+                  <span className="truncate">{groupName(gid)}</span>
+                  <Badge variant="muted">new</Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto size-6"
+                    aria-label={`Remove group ${groupName(gid)}`}
+                    onClick={() => removePickedGroup(gid)}
                   >
                     <X className="size-3.5" />
                   </Button>
@@ -238,21 +254,7 @@ export function PermissionsDialog({ open, onOpenChange, target, onSaved }: Permi
               ))}
             </ul>
           )}
-          {availableGroups.length > 0 && (
-            <fieldset className="flex flex-col gap-1">
-              <legend className="text-xs text-muted-foreground">Add groups</legend>
-              {availableGroups.map((g) => (
-                <label key={g.group_id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={pickedGroupIds.has(g.group_id)}
-                    onChange={() => toggleGroup(g.group_id)}
-                  />
-                  {g.name}
-                </label>
-              ))}
-            </fieldset>
-          )}
+          <Combobox label="Add a group" placeholder="Add a group" options={groupOptions} onSelect={addGroup} />
         </section>
 
         <div className="mt-1 flex justify-end gap-2">

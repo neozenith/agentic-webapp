@@ -1,0 +1,20 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"id": "joshs-karaoke-bar",
+	"name": "Josh's Karaoke Bar",
+	"tagline": "At Josh's Karaoke Bar, Everyone is your friend you haven't met yet.",
+	"description": "Melbourne CBD's authentic Japanese-style karaoke bar — Tokyo nightlife energy meets Melbourne laneway grunge. Neon magenta on deep purple, Bebas Neue display, high-contrast neon accents.",
+	"version": "1.0.0",
+	"source": "https://joshpeak.net/joshs-karaoke-bar/",
+	"assets": {
+		"logo": "logo.svg",
+		"logoDark": "logo-dark.svg",
+		"icon": "icon.svg"
+	},
+	"tokens": {
+		"core": "tokens/core.tokens.json",
+		"light": "tokens/light.tokens.json",
+		"dark": "tokens/dark.tokens.json"
+	},
+	"swatches": ["#E91E63", "#00D4FF", "#FFD700", "#1A1625", "#F5F5F5"]
+}

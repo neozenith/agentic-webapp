@@ -92,7 +92,17 @@
     margin: 0;
     background: var(--background);
     @apply text-foreground;
-    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    /* --font-sans is written live by BrandProvider from the active brand's
+       font.sans token; the literal chain is the no-brand fallback. */
+    font-family: var(--font-sans, ui-sans-serif, system-ui, -apple-system, sans-serif);
+  }
+  /* Display headings use the brand's font.display when it declares one; brands
+     without a display font (e.g. V2 AI) leave --font-display unset, so this
+     gracefully falls back to --font-sans (then the literal chain). */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display, var(--font-sans, ui-sans-serif, system-ui, -apple-system, sans-serif));
   }
   /* The dark theme keeps the original slate glow; light mode stays flat. */
   .dark body {

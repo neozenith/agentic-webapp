@@ -80,11 +80,15 @@ afterEach(() => {
 describe("BrandProvider", () => {
   it("applies the default brand's inline CSS vars and data-brand on <html>", () => {
     renderProbe();
-    expect(screen.getByTestId("brand")).toHaveTextContent("default-v2ai");
-    expect(document.documentElement.dataset.brand).toBe("default-v2ai");
-    // default-v2ai LIGHT: primary = yellow.400 (#FEC40E), background = white.
-    expect(cssVar("--primary")).toBe("#fec40e");
-    expect(cssVar("--background")).toBe("#ffffff");
+    // joshs-karaoke-bar is the pinned default (brands[0]).
+    expect(screen.getByTestId("brand")).toHaveTextContent("joshs-karaoke-bar");
+    expect(document.documentElement.dataset.brand).toBe("joshs-karaoke-bar");
+    // karaoke LIGHT: primary = neon magenta (#E91E63), background = off-white (#F5F5F5).
+    expect(cssVar("--primary")).toBe("#e91e63");
+    expect(cssVar("--background")).toBe("#f5f5f5");
+    // Live fonts: brand font tokens resolve onto --font-sans / --font-display.
+    expect(cssVar("--font-sans")).toContain("inter");
+    expect(cssVar("--font-display")).toContain("bebas neue");
   });
 
   it("switching brand repaints the inline vars, data-brand, and persists the choice", async () => {
@@ -103,11 +107,11 @@ describe("BrandProvider", () => {
 
   it("re-resolves to the dark semantic layer when the theme flips", async () => {
     renderProbe();
-    expect(cssVar("--background")).toBe("#ffffff"); // light
+    expect(cssVar("--background")).toBe("#f5f5f5"); // karaoke light = off-white
 
     await userEvent.click(screen.getByRole("button", { name: "toggle-theme" }));
-    // default-v2ai DARK: background = black (#000000).
-    expect(cssVar("--background")).toBe("#000000");
+    // karaoke DARK: background = deep purple (#1A1625).
+    expect(cssVar("--background")).toBe("#1a1625");
   });
 
   it("restores a previously chosen brand from localStorage", () => {

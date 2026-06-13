@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" role="img" aria-label="Josh's Karaoke Bar mark">
+  <rect width="40" height="40" rx="8" fill="#E91E63"/>
+  <rect x="16" y="8" width="8" height="15" rx="4" fill="#F5F5F5"/>
+  <path d="M12 19 a8 8 0 0 0 16 0" fill="none" stroke="#F5F5F5" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="20" y1="27" x2="20" y2="31" stroke="#F5F5F5" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="15" y1="32" x2="25" y2="32" stroke="#F5F5F5" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

@@ -22,5 +22,20 @@ export default defineConfig({
     trace: "on",
     video: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      // Desktop evidence suite (chat.spec.ts). Excludes the mobile spec so the
+      // agent/cost tests don't run twice.
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: /mobile-layout\.spec\.ts/,
+    },
+    {
+      // Mobile layout suite (mobile-layout.spec.ts only). iPhone 11 descriptor =
+      // WebKit, 414x715 CSS viewport (screen 414x896), DPR 2, isMobile + hasTouch.
+      name: "iphone-11",
+      use: { ...devices["iPhone 11"] },
+      testMatch: /mobile-layout\.spec\.ts/,
+    },
+  ],
 });

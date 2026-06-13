@@ -89,12 +89,17 @@ export const flattenTokens = (tree: TokenGroup, combined: TokenGroup = tree): Re
 /**
  * Map a flat token path to its corresponding shadcn/ui CSS-variable name.
  * Tokens whose path matches `color.<name>` map to `--<name>`; `radius.base`
- * maps to `--radius`. Unknown shapes return null and are silently skipped —
- * the applier only writes variables it knows about.
+ * maps to `--radius`; `font.sans` / `font.display` map to `--font-sans` /
+ * `--font-display` (the value is already a usable CSS font-family string —
+ * `flattenTokens` joins the DTCG fontFamily array and quotes any entry with a
+ * comma). Unknown shapes return null and are silently skipped — the applier
+ * only writes variables it knows about.
  */
 export const tokenPathToCssVar = (path: string): string | null => {
   if (path.startsWith("color.")) return `--${path.slice("color.".length)}`;
   if (path === "radius.base") return "--radius";
+  if (path === "font.sans") return "--font-sans";
+  if (path === "font.display") return "--font-display";
   return null;
 };
 

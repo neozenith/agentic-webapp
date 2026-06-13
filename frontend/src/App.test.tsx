@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { App } from "./App";
 import { AuthProvider } from "./components/auth";
@@ -29,6 +30,8 @@ const renderApp = (path = "/chat") =>
     </ThemeProvider>,
   );
 
+afterEach(() => localStorage.clear());
+
 describe("App shell", () => {
   it("renders the brand, nav tabs, the active route, and the outlet", () => {
     renderApp("/chat");
@@ -51,6 +54,58 @@ describe("App shell", () => {
   it("falls back to 'guest' when there is no signed-in identity", async () => {
     renderApp("/chat"); // default /api/me handler returns null identity
     expect(await screen.findByText("guest")).toBeInTheDocument();
+  });
+});
+
+// The shell carries no fixed-width column on mobile: the rail is `hidden md:flex` (out of the
+// flex row), and a hamburger in the header opens an off-canvas drawer instead. jsdom has no
+// layout engine, so we assert the structural/aria contract (toggle state, drawer mount, nav
+// reachability) rather than pixel widths — the e2e mobile suite owns the overflow measurement.
+describe("mobile nav drawer", () => {
+  it("opens from the header hamburger, exposes the nav, and closes via the backdrop", async () => {
+    const user = userEvent.setup();
+    renderApp("/chat");
+
+    const hamburger = screen.getByRole("button", { name: /toggle navigation menu/i });
+    expect(hamburger).toHaveAttribute("aria-expanded", "false");
+    expect(hamburger).toHaveAttribute("aria-controls", "mobile-nav-drawer");
+    // Closed: the drawer (and its backdrop) is not mounted, so it can't add to the scroll width.
+    expect(screen.queryByRole("button", { name: /close navigation menu/i })).not.toBeInTheDocument();
+
+    await user.click(hamburger);
+    expect(hamburger).toHaveAttribute("aria-expanded", "true");
+    const backdrop = screen.getByRole("button", { name: /close navigation menu/i });
+    expect(backdrop).toBeInTheDocument();
+    // Nav is reachable inside the drawer (a second "Chat" link, in addition to the desktop rail).
+    const drawer = screen.getByRole("complementary", { name: "Navigation" });
+    expect(within(drawer).getByRole("link", { name: "Chat" })).toBeInTheDocument();
+
+    await user.click(backdrop);
+    expect(hamburger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: /close navigation menu/i })).not.toBeInTheDocument();
+  });
+
+  it("closes the drawer when a nav item is tapped", async () => {
+    const user = userEvent.setup();
+    renderApp("/chat");
+    await user.click(screen.getByRole("button", { name: /toggle navigation menu/i }));
+
+    const drawer = screen.getByRole("complementary", { name: "Navigation" });
+    await user.click(within(drawer).getByRole("link", { name: "Home" }));
+
+    expect(screen.queryByRole("complementary", { name: "Navigation" })).not.toBeInTheDocument();
+  });
+
+  it("closes the drawer on Escape", async () => {
+    const user = userEvent.setup();
+    renderApp("/chat");
+    const hamburger = screen.getByRole("button", { name: /toggle navigation menu/i });
+    await user.click(hamburger);
+    expect(screen.getByRole("complementary", { name: "Navigation" })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(hamburger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("complementary", { name: "Navigation" })).not.toBeInTheDocument();
   });
 });
 
