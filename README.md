@@ -6,8 +6,12 @@ in a **single multi-container Cloud Run service**. Identity is enforced by
 Identity-Aware Proxy (IAP); agent sessions persist to **Firestore** so a
 conversation is durably resumable by its `/chat/:sessionId` URL after a cold start.
 Asset metadata and per-call LLM metering (tokens + USD) also default to Firestore
-(BigQuery remains a switchable backend), and uploaded asset blobs live in GCS. Three
-isolated GCP projects provide dev / test / prod, deployed keylessly from GitHub
+(BigQuery remains a switchable backend), and uploaded asset blobs live in GCS. You can
+upload a photo from the Assets page **or** attach one in chat (both write to the same
+GCS-backed store); the agent has tools to look up an asset, read it (e.g. a receipt),
+and record the extracted details to an analytics store — assets stay
+single-source-of-truth, never duplicated into ADK's artifact store ([ADR-0006](docs/adr/adr-0006-assets-single-source-of-truth.md)).
+Three isolated GCP projects provide dev / test / prod, deployed keylessly from GitHub
 Actions via Workload Identity Federation.
 
 ## Deployed environments

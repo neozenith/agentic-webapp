@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # set it to simulate users — see ADR-0004. Set false to ignore client identity.
     trust_forwarded_user: bool = True
 
+    # RBAC: real IAP-email -> roles mapping (prod). JSON env, e.g.
+    # RBAC_USER_ROLES='{"josh@example.com":["admin"]}'. In non-prod, test personas
+    # (rbac.PERSONAS) provide identities; this still wins if a key matches. Unmapped
+    # signed-in users get rbac.DEFAULT_ROLE.
+    rbac_user_roles: dict[str, list[str]] = {}
+
     # Base URL of the ADK agent sidecar the backend reverse-proxies to. In Cloud
     # Run (single service) it's localhost; in docker-compose it's the service name.
     agent_base_url: str = "http://localhost:8081"

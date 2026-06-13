@@ -34,6 +34,13 @@ class AssetMetadataManager:
     async def delete(self, asset_id: str) -> None:
         await self._db.delete(self._table, key_field="asset_id", key=asset_id)
 
+    async def update(self, meta: AssetMetadata) -> AssetMetadata:
+        """Replace a record (e.g. after a share/ownership change). The generic DatabaseManager
+        has no upsert, so this is delete-then-insert keyed on asset_id."""
+        await self._db.delete(self._table, key_field="asset_id", key=meta.asset_id)
+        await self._db.insert(self._table, [self._to_row(meta)])
+        return meta
+
     # --- Row <-> model mapping (the table schema lives here) ---
 
     @staticmethod
@@ -46,6 +53,10 @@ class AssetMetadataManager:
             "size_bytes": meta.size_bytes,
             "created_at": meta.created_at.isoformat(),
             "updated_at": meta.updated_at.isoformat(),
+            "owner_id": meta.owner_id,
+            "folder_id": meta.folder_id,
+            "shared_user_ids_json": json.dumps(meta.shared_user_ids or []),
+            "shared_group_ids_json": json.dumps(meta.shared_group_ids or []),
             # Nested tags are flattened to a JSON string so the table schema stays
             # simple and portable across backends.
             "metadata_json": json.dumps(meta.tags or {}),
@@ -53,6 +64,10 @@ class AssetMetadataManager:
 
     @staticmethod
     def _from_row(row: Row) -> AssetMetadata:
+        def _arr(key: str) -> list[str]:
+            raw = row.get(key)
+            return json.loads(raw) if isinstance(raw, str) and raw else (raw or [])
+
         raw_tags = row.get("metadata_json")
         tags = json.loads(raw_tags) if isinstance(raw_tags, str) and raw_tags else (raw_tags or {})
         return AssetMetadata(
@@ -63,5 +78,9 @@ class AssetMetadataManager:
             size_bytes=row.get("size_bytes"),
             created_at=row["created_at"],  # pydantic coerces str|datetime
             updated_at=row["updated_at"],
+            owner_id=row.get("owner_id"),
+            folder_id=row.get("folder_id"),
+            shared_user_ids=_arr("shared_user_ids_json"),
+            shared_group_ids=_arr("shared_group_ids_json"),
             tags=tags,
         )

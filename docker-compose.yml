@@ -23,7 +23,11 @@ services:
       SESSION_SERVICE_URI: "firestore://"
       DATABASE_BACKEND: firestore
       FIRESTORE_DATABASE: agentic-webapp
+      # Analytics (AnalyticsManager) is its own axis: BigQuery in the cloud-integrated run.
+      BIGQUERY_DATASET: agentic_webapp
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/adc.json
+      # The agent's asset tools reach the backend by compose service name.
+      BACKEND_BASE_URL: http://backend:8080
     volumes:
       - ${HOME}/.config/gcloud/application_default_credentials.json:/gcp/adc.json:ro
 

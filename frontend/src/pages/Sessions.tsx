@@ -1,6 +1,10 @@
+import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getMe, listSessions, type SessionMeta } from "../api";
 
 export function Sessions() {
@@ -14,41 +18,55 @@ export function Sessions() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 
-  if (error) return <p className="error">⚠️ {error}</p>;
-  if (!sessions) return <p className="muted">Loading sessions…</p>;
+  if (error) return <p className="text-destructive">⚠️ {error}</p>;
+  if (!sessions) return <p className="text-muted-foreground">Loading sessions…</p>;
 
   return (
-    <section className="card">
-      <div className="chat-header">
-        <h3>Your sessions</h3>
-        <Link className="btn ghost" to="/chat">
-          New chat
-        </Link>
-      </div>
-      {sessions.length === 0 ? (
-        <p className="muted">
-          No sessions yet. <Link to="/chat">Start one →</Link>
-        </p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>session</th>
-              <th>last updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  <Link to={`/chat/${s.id}`}>{s.id}</Link>
-                </td>
-                <td className="muted">{s.lastUpdateTime ? new Date(s.lastUpdateTime * 1000).toLocaleString() : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
+    <Card className="animate-fade-in-up">
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle>Your sessions</CardTitle>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/chat">
+            <Plus /> New chat
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {sessions.length === 0 ? (
+          <p className="text-muted-foreground">
+            No sessions yet.{" "}
+            <Link className="text-secondary-foreground underline-offset-4 hover:underline" to="/chat">
+              Start one →
+            </Link>
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>session</TableHead>
+                <TableHead>id</TableHead>
+                <TableHead>last updated</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell>
+                    {/* the summariser's short title, falling back to the id */}
+                    <Link className="text-secondary-foreground hover:underline" to={`/chat/${s.id}`}>
+                      {s.state?.title ?? "Untitled session"}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{s.id.slice(0, 12)}…</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.lastUpdateTime ? new Date(s.lastUpdateTime * 1000).toLocaleString() : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }

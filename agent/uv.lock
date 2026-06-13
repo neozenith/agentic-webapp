@@ -42,6 +42,7 @@ dependencies = [
     { name = "agentic-core" },
     { name = "google-adk" },
     { name = "google-cloud-firestore" },
+    { name = "httpx" },
 ]
 
 [package.dev-dependencies]
@@ -56,6 +57,7 @@ requires-dist = [
     { name = "agentic-core", editable = "../libs/core" },
     { name = "google-adk", specifier = ">=1.0.0" },
     { name = "google-cloud-firestore", specifier = ">=2.27.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
 ]
 
 [package.metadata.requires-dev]

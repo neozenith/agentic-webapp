@@ -91,6 +91,75 @@ describe("Chat", () => {
     expect(await screen.findByText(/agent error 500/i)).toBeInTheDocument();
   });
 
+  it("renders the agent reply as markdown, including an asset preview image", async () => {
+    server.use(
+      me,
+      http.get("/apps/assistant/users/uid/sessions/s1", () => HttpResponse.json({ id: "s1", events: [] })),
+      http.post("/run", () =>
+        HttpResponse.json([
+          {
+            content: {
+              parts: [{ text: "**Done.** Here is your receipt:\n\n![preview](/api/assets/a1/content)" }],
+            },
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    renderChat("/chat/s1");
+    await screen.findByText(/Ask the agent something/i);
+    await user.type(screen.getByPlaceholderText(/Type a message/i), "show it");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+    // Bold markdown renders as <strong>, and the preview_url renders as an <img>.
+    expect(await screen.findByText("Done.")).toBeInTheDocument();
+    const img = await screen.findByRole("img", { name: "preview" });
+    expect(img).toHaveAttribute("src", "/api/assets/a1/content");
+  });
+
+  it("attaches a photo (upload → asset) and references its id in the message", async () => {
+    let sentText = "";
+    server.use(
+      me,
+      http.get("/apps/assistant/users/uid/sessions/s1", () => HttpResponse.json({ id: "s1", events: [] })),
+      http.post("/api/assets", () =>
+        HttpResponse.json(
+          {
+            asset_id: "asset-9",
+            filename: "receipt.png",
+            content_type: "image/png",
+            size_bytes: 3,
+            created_at: "2026-06-10T00:00:00Z",
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post("/run", async ({ request }) => {
+        const body = (await request.json()) as { new_message: { parts: { text: string }[] } };
+        sentText = body.new_message.parts[0].text;
+        return HttpResponse.json([{ content: { parts: [{ text: "got it" }] } }]);
+      }),
+    );
+    const user = userEvent.setup();
+    const { container } = renderChat("/chat/s1");
+    await screen.findByText(/Ask the agent something/i); // loaded
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(["png"], "receipt.png", { type: "image/png" }));
+    // The attachment chip shows the uploaded filename.
+    expect(await screen.findByText("receipt.png")).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText(/Type a message/i), "read this receipt");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+    await screen.findByText("got it");
+    // The agent received the typed text PLUS a parseable asset reference.
+    expect(sentText).toContain("read this receipt");
+    expect(sentText).toContain("asset-9");
+    // The sent user message keeps an inline image preview of the attachment (the bug fix).
+    const preview = await screen.findByRole("img", { name: "receipt.png" });
+    expect(preview).toHaveAttribute("src", "/api/assets/asset-9/content");
+    // …and the typed prose still shows, without the raw "[attached asset …]" reference.
+    expect(screen.getByText("read this receipt")).toBeInTheDocument();
+    expect(screen.queryByText(/\[attached asset/)).not.toBeInTheDocument();
+  });
+
   it("starts a new chat via the New chat button", async () => {
     server.use(
       me,

@@ -1,122 +1,110 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { fetchUsage, fetchUsageRecords, type UsageBucket, type UsageRecord, type UsageSummary } from "../api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { fetchUsage, fetchUsers, type UsageSummary, type UserSummary } from "../api";
 
 const usd = (n: number) => `$${n.toFixed(6)}`;
 
-function RecordsTable({ records }: { records: UsageRecord[] }) {
+function Stat({ value, label }: { value: string | number; label: string }) {
   return (
-    <div className="card">
-      <h3>recent calls</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>session</th>
-            <th>model</th>
-            <th>tokens</th>
-            <th>cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.length === 0 && (
-            <tr>
-              <td colSpan={4} className="muted">
-                no calls yet
-              </td>
-            </tr>
-          )}
-          {records.map((r) => (
-            <tr key={r.request_id}>
-              <td>
-                {/* clicking a session relaunches it in the chat */}
-                <Link to={`/chat/${r.session_id}`}>{r.session_id}</Link>
-              </td>
-              <td className="muted">{r.model_id}</td>
-              <td>{r.total_tokens}</td>
-              <td>{usd(r.est_cost_usd)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function BucketTable({ title, rows }: { title: string; rows: Record<string, UsageBucket> }) {
-  const entries = Object.entries(rows).sort((a, b) => b[1].est_cost_usd - a[1].est_cost_usd);
-  return (
-    <div className="card">
-      <h3>{title}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>{title.includes("model") ? "model" : "user"}</th>
-            <th>calls</th>
-            <th>tokens</th>
-            <th>est. cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.length === 0 && (
-            <tr>
-              <td colSpan={4} className="muted">
-                no usage yet
-              </td>
-            </tr>
-          )}
-          {entries.map(([k, v]) => (
-            <tr key={k}>
-              <td>{k}</td>
-              <td>{v.calls}</td>
-              <td>{v.total_tokens}</td>
-              <td>{usd(v.est_cost_usd)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="flex flex-col">
+      <span className="text-3xl font-bold text-primary tabular-nums">{value}</span>
+      <span className="text-muted-foreground text-sm">{label}</span>
     </div>
   );
 }
 
 export function Admin() {
-  const [data, setData] = useState<UsageSummary | null>(null);
-  const [records, setRecords] = useState<UsageRecord[]>([]);
+  const [totals, setTotals] = useState<UsageSummary | null>(null);
+  const [users, setUsers] = useState<UserSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsage()
-      .then(setData)
+      .then(setTotals)
       .catch((e) => setError(String(e)));
-    fetchUsageRecords()
-      .then(setRecords)
-      .catch(() => {
-        /* records are supplementary; the summary above is the primary view */
-      });
+    fetchUsers()
+      .then(setUsers)
+      .catch((e) => setError(String(e)));
   }, []);
 
-  if (error) return <p className="error">⚠️ {error}</p>;
-  if (!data) return <p className="muted">Loading usage…</p>;
+  if (error) return <p className="text-destructive">⚠️ {error}</p>;
+  if (!totals || !users) return <p className="text-muted-foreground">Loading usage…</p>;
 
   return (
-    <section>
-      <div className="card stats">
-        <div>
-          <span className="big">{data.totals.calls}</span>
-          <span className="muted">calls</span>
-        </div>
-        <div>
-          <span className="big">{data.totals.total_tokens}</span>
-          <span className="muted">tokens</span>
-        </div>
-        <div>
-          <span className="big">{usd(data.totals.est_cost_usd)}</span>
-          <span className="muted">est. cost</span>
-        </div>
-      </div>
-      <BucketTable title="by model" rows={data.by_model} />
-      <BucketTable title="by user" rows={data.by_user} />
-      <RecordsTable records={records} />
+    <section className="flex flex-col gap-4">
+      <Card>
+        <CardContent className="flex gap-10 pt-6">
+          <Stat value={totals.totals.calls} label="calls" />
+          <Stat value={totals.totals.total_tokens} label="tokens" />
+          <Stat value={usd(totals.totals.est_cost_usd)} label="est. cost" />
+          <Stat value={users.length} label="users" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-2">
+          <CardTitle>Users</CardTitle>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin/groups">Manage groups</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>user</TableHead>
+                <TableHead>sessions</TableHead>
+                <TableHead>calls</TableHead>
+                <TableHead>tokens</TableHead>
+                <TableHead>est. cost</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-muted-foreground">
+                    no usage yet
+                  </TableCell>
+                </TableRow>
+              )}
+              {users.map((u) => (
+                <TableRow key={u.user_id}>
+                  <TableCell>
+                    {/* drill into a single user's sessions; show the conventional identity when known */}
+                    {u.name || u.email ? (
+                      <div className="flex flex-col">
+                        {u.name && <span className="font-medium">{u.name}</span>}
+                        {u.email && <span className="text-xs text-muted-foreground">{u.email}</span>}
+                        <Link
+                          className="font-mono text-xs text-muted-foreground hover:underline"
+                          to={`/admin/users/${encodeURIComponent(u.user_id)}`}
+                        >
+                          {u.user_id}
+                        </Link>
+                      </div>
+                    ) : (
+                      <Link
+                        className="text-secondary-foreground hover:underline"
+                        to={`/admin/users/${encodeURIComponent(u.user_id)}`}
+                      >
+                        {u.user_id}
+                      </Link>
+                    )}
+                  </TableCell>
+                  <TableCell>{u.sessions}</TableCell>
+                  <TableCell>{u.calls}</TableCell>
+                  <TableCell>{u.total_tokens}</TableCell>
+                  <TableCell>{usd(u.est_cost_usd)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </section>
   );
 }

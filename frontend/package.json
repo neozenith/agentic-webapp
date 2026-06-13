@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently --kill-others --names \"agent,backend,frontend\" --prefix-colors \"magenta,blue,green\" \"uv run --directory ../agent adk web --host 0.0.0.0 --port 8081 agents\" \"uv run --directory ../backend uvicorn agentic_webapp.main:app --reload --host 0.0.0.0 --port 8080\" \"vite\"",
+    "dev:frontend-only": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -12,12 +13,22 @@
     "fix": "biome check --write ."
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.5",
+    "@tailwindcss/vite": "^4.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.17.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.1.0"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
+    "@tailwindcss/typography": "^0.5.20",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -25,6 +36,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^4.1.8",
+    "concurrently": "^10.0.3",
     "jsdom": "^29.1.1",
     "msw": "^2.14.6",
     "typescript": "^5.7.2",

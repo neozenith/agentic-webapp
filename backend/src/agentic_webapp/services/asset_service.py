@@ -16,6 +16,10 @@ from agentic_core.storage import StorageManager
 
 log = logging.getLogger(__name__)
 
+# Aliased at module scope so annotations don't resolve `list[...]` to AssetService.list
+# (the method shadows the builtin inside the class body — same reason base.py has `Rows`).
+AssetList = list[AssetMetadata]
+
 
 class AssetService:
     def __init__(
@@ -40,6 +44,8 @@ class AssetService:
         filename: str | None = None,
         content_type: str | None = None,
         tags: dict[str, str] | None = None,
+        owner_id: str | None = None,
+        folder_id: str | None = None,
     ) -> AssetMetadata:
         """Store the bytes AND record their metadata. Returns the catalogue record."""
         asset_id = uuid4().hex
@@ -54,17 +60,47 @@ class AssetService:
             size_bytes=stored.size if stored.size is not None else len(data),
             created_at=now,
             updated_at=now,
+            owner_id=owner_id,
+            folder_id=folder_id,
             tags=tags or {},
         )
         await self._metadata.record(meta)
-        log.info("stored asset %s (%s, %s bytes)", asset_id, meta.content_type, meta.size_bytes)
+        log.info("stored asset %s owner=%s (%s, %s bytes)", asset_id, owner_id, meta.content_type, meta.size_bytes)
         return meta
+
+    # --- Storage + metadata mutation (visibility lives in the routes via agentic_core.access) ---
 
     async def get(self, asset_id: str) -> AssetMetadata | None:
         return await self._metadata.get(asset_id)
 
-    async def list(self, *, limit: int = 100) -> list[AssetMetadata]:
+    async def list(self, *, limit: int = 100) -> AssetList:
         return await self._metadata.list(limit=limit)
+
+    async def set_share(
+        self,
+        meta: AssetMetadata,
+        *,
+        add_user_ids: Sequence[str] = (),
+        add_group_ids: Sequence[str] = (),
+        remove_user_ids: Sequence[str] = (),
+        remove_group_ids: Sequence[str] = (),
+    ) -> AssetMetadata:
+        """Apply share add/remove deltas to the asset's principal lists and persist."""
+        users = (set(meta.shared_user_ids) | {u for u in add_user_ids if u}) - set(remove_user_ids)
+        groups = (set(meta.shared_group_ids) | {g for g in add_group_ids if g}) - set(remove_group_ids)
+        meta.shared_user_ids = sorted(users)
+        meta.shared_group_ids = sorted(groups)
+        await self._metadata.update(meta)
+        return meta
+
+    async def move(self, asset_id: str, folder_id: str | None) -> AssetMetadata | None:
+        """Move an asset into a folder (None = root). Returns the updated record, or None."""
+        meta = await self._metadata.get(asset_id)
+        if meta is None:
+            return None
+        meta.folder_id = folder_id
+        await self._metadata.update(meta)
+        return meta
 
     async def signed_url(self, asset_id: str) -> str | None:
         meta = await self._metadata.get(asset_id)

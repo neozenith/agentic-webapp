@@ -14,6 +14,9 @@ toward general, reusable principles over one-off specifics.
 | [0003](adr-0003-environment-data-sensitivity-tiers.md) | Environment data-sensitivity tiers | Accepted · implemented |
 | [0004](adr-0004-user-identity-and-simulation.md) | User identity from IAP; header simulation in non-prod | Accepted · partially implemented |
 | [0005](adr-0005-local-dev-against-cloud-services.md) | Local development against cloud services | Accepted · partially implemented |
+| [0006](adr-0006-assets-single-source-of-truth.md) | Assets have a single source of truth (no ADK artifact store) | Accepted · implemented |
+| [0007](adr-0007-rbac-areas-and-personas.md) | RBAC: role-gated areas + non-prod test personas | Accepted · implemented |
+| [0008](adr-0008-folders-groups-unified-sharing.md) | Folders, groups, unified file/folder sharing | Accepted · implemented |
 
 ## Format
 
