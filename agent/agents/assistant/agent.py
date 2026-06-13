@@ -17,6 +17,7 @@ from google.adk.agents import Agent
 
 from .attachments import attach_referenced_assets
 from .bookkeeping import record_usage
+from .search import web_search
 from .summarizer import summarize_session
 from .tools import attach_asset, list_assets, record_extraction
 
@@ -40,14 +41,19 @@ odometer):
 - After reading a document, extract the relevant details and call
   `record_extraction(asset_id, doc_type, fields_json)` — choose a short `doc_type`
   (e.g. "fuel_receipt", "odometer", "invoice") and pass `fields_json` as a JSON object of the
-  key/values you found. Then briefly confirm what you recorded."""
+  key/values you found. Then briefly confirm what you recorded.
+
+When the user asks about current events, recent releases, prices, or anything your training
+may be stale on (or any fact you are not confident about), call the `web_search` tool to
+ground your answer in fresh information from the internet. Summarise what it found in your own
+words and cite the sources it returned."""
 
 root_agent = Agent(
     name="assistant",
     model=MODEL,
     description="General-purpose assistant for agentic-webapp, with asset + analytics tools.",
     instruction=_INSTRUCTION,
-    tools=[list_assets, attach_asset, record_extraction],
+    tools=[list_assets, attach_asset, record_extraction, web_search],
     # Inject the current turn's referenced assets before each model call (turn-scoped).
     before_model_callback=attach_referenced_assets,
     # Itemise token usage + cost to the bookkeeping table after every model call.

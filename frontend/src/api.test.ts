@@ -11,6 +11,7 @@ import {
   listSessions,
   runAgent,
   sessionToMessages,
+  sessionToTurns,
 } from "./api";
 import { server } from "./test/server";
 
@@ -32,6 +33,41 @@ describe("sessionToMessages", () => {
 
   it("returns an empty transcript when there are no events", () => {
     expect(sessionToMessages({ id: "s" })).toEqual([]);
+  });
+});
+
+describe("sessionToTurns", () => {
+  it("maps events to typed turns, preserving tool calls and responses", () => {
+    const turns = sessionToTurns({
+      id: "s",
+      events: [
+        { author: "user", content: { parts: [{ text: "list assets" }] } },
+        { author: "assistant", content: { parts: [{ functionCall: { name: "list_assets", args: { limit: 5 } } }] } },
+        { author: "assistant", content: { parts: [{ functionResponse: { name: "list_assets" } }] } },
+        { author: "assistant", content: { parts: [{ text: "done" }] } },
+        { author: "assistant", content: { parts: [{}] } }, // truly empty -> skipped
+      ],
+    });
+    expect(turns).toEqual([
+      { role: "user", text: "list assets", toolCalls: [], hasResponse: false },
+      { role: "agent", text: "", toolCalls: [{ name: "list_assets", args: { limit: 5 } }], hasResponse: false },
+      { role: "agent", text: "", toolCalls: [], hasResponse: true },
+      { role: "agent", text: "done", toolCalls: [], hasResponse: false },
+    ]);
+  });
+
+  it("defaults a nameless tool call and empty args", () => {
+    const turns = sessionToTurns({
+      id: "s",
+      events: [{ author: "assistant", content: { parts: [{ functionCall: {} }] } }],
+    });
+    expect(turns).toEqual([
+      { role: "agent", text: "", toolCalls: [{ name: "(unknown)", args: {} }], hasResponse: false },
+    ]);
+  });
+
+  it("returns an empty list when there are no events", () => {
+    expect(sessionToTurns({ id: "s" })).toEqual([]);
   });
 });
 

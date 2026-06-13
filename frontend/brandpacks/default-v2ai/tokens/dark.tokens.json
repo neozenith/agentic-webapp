@@ -1,0 +1,26 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"$description": "Semantic tokens for V2 AI DARK mode. Pure black hero (matches V2.AI's landing page background), zinc-50 foreground, signature yellow #FEC40E for primary and accent. Names match this app's shadcn/ui CSS variable set 1:1 (no sidebar-* / chart-*).",
+	"color": {
+		"$type": "color",
+		"background": { "$value": "{color.black}" },
+		"foreground": { "$value": "{color.zinc.50}" },
+		"card": { "$value": "{color.zinc.900}" },
+		"card-foreground": { "$value": "{color.zinc.50}" },
+		"popover": { "$value": "{color.zinc.900}" },
+		"popover-foreground": { "$value": "{color.zinc.50}" },
+		"primary": { "$value": "{color.yellow.400}" },
+		"primary-foreground": { "$value": "{color.zinc.950}" },
+		"secondary": { "$value": "{color.zinc.800}" },
+		"secondary-foreground": { "$value": "{color.zinc.50}" },
+		"muted": { "$value": "{color.zinc.800}" },
+		"muted-foreground": { "$value": "{color.zinc.400}" },
+		"accent": { "$value": "{color.zinc.800}" },
+		"accent-foreground": { "$value": "{color.yellow.400}" },
+		"destructive": { "$value": "{color.rose.500}" },
+		"destructive-foreground": { "$value": "{color.zinc.50}" },
+		"border": { "$value": "{color.zinc.800}" },
+		"input": { "$value": "{color.zinc.800}" },
+		"ring": { "$value": "{color.yellow.400}" }
+	}
+}

@@ -1,0 +1,26 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"$description": "Semantic tokens for V2 AI LIGHT mode. White background, near-black foreground (zinc-950), V2.AI signature yellow as primary. Names match this app's shadcn/ui CSS variable set 1:1 (no sidebar-* / chart-* — not used here).",
+	"color": {
+		"$type": "color",
+		"background": { "$value": "{color.white}" },
+		"foreground": { "$value": "{color.zinc.950}" },
+		"card": { "$value": "{color.white}" },
+		"card-foreground": { "$value": "{color.zinc.950}" },
+		"popover": { "$value": "{color.white}" },
+		"popover-foreground": { "$value": "{color.zinc.950}" },
+		"primary": { "$value": "{color.yellow.400}" },
+		"primary-foreground": { "$value": "{color.zinc.950}" },
+		"secondary": { "$value": "{color.zinc.100}" },
+		"secondary-foreground": { "$value": "{color.zinc.950}" },
+		"muted": { "$value": "{color.zinc.100}" },
+		"muted-foreground": { "$value": "{color.zinc.500}" },
+		"accent": { "$value": "{color.yellow.100}" },
+		"accent-foreground": { "$value": "{color.zinc.950}" },
+		"destructive": { "$value": "{color.rose.500}" },
+		"destructive-foreground": { "$value": "{color.white}" },
+		"border": { "$value": "{color.zinc.200}" },
+		"input": { "$value": "{color.zinc.200}" },
+		"ring": { "$value": "{color.yellow.400}" }
+	}
+}
