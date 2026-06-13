@@ -24,11 +24,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const load = useCallback(() => {
     setLoading(true);
-    return Promise.all([getMe().catch(() => null), fetchPersonas().catch(() => [])])
-      .then(([m, p]) => {
-        setMe(m);
+    // Fetch personas first: in non-prod, default to the first persona (admin) when none is
+    // chosen, so the app is usable out of the box. Then resolve identity (apiFetch sends the
+    // persona as the IAP header). In prod personas is [] — the real IAP identity is used.
+    return fetchPersonas()
+      .catch(() => [])
+      .then((p) => {
         setPersonas(p);
+        if (!getPersona() && p.length > 0) {
+          setPersona(p[0].email);
+          setActivePersona(p[0].email);
+        }
+        return getMe().catch(() => null);
       })
+      .then((m) => setMe(m))
       .finally(() => setLoading(false));
   }, []);
 
