@@ -1,29 +1,15 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 
-const TABS = [
-  ["/", "Home"],
-  ["/chat", "Chat"],
-  ["/sessions", "Sessions"],
-  ["/assets", "Assets"],
-  ["/admin", "Admin"],
-] as const;
+import { Sidebar } from "@/components/Sidebar";
 
 export function App() {
-  const { pathname } = useLocation();
   return (
-    <div className="shell">
-      <header className="topbar">
-        <span className="brand">🛡️ agentic-webapp</span>
-        <nav>
-          {TABS.map(([to, label]) => (
-            <Link key={to} to={to} className={pathname === to ? "tab active" : "tab"}>
-              {label}
-            </Link>
-          ))}
-        </nav>
-      </header>
-      <main className="content">
-        <Outlet />
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="mx-auto max-w-4xl">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

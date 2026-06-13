@@ -17,8 +17,9 @@ describe("App shell", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText(/agentic-webapp/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Chat" })).toHaveClass("active");
-    expect(screen.getByRole("link", { name: "Home" })).not.toHaveClass("active");
+    // NavLink marks the active route with aria-current="page".
+    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
     expect(screen.getByText("chat-content")).toBeInTheDocument();
   });
 });

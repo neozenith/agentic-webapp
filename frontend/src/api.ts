@@ -135,6 +135,16 @@ export async function listAssets(limit = 100): Promise<Asset[]> {
   return resp.json();
 }
 
+/** Upload a file as an asset. The SERVER mints the asset_id (we read it back) and stores
+ * the bytes in GCS — the single source of truth shared by this page and the chat agent. */
+export async function uploadAsset(file: File): Promise<Asset> {
+  const body = new FormData();
+  body.append("file", file);
+  const resp = await fetch("/api/assets", { method: "POST", body });
+  if (!resp.ok) throw new Error(`upload error ${resp.status}`);
+  return resp.json();
+}
+
 // --- Admin: itemised usage records (each carries a session_id to relaunch) ---
 export interface UsageRecord {
   request_id: string;

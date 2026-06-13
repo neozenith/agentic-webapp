@@ -12,3 +12,4 @@ htmlcov/
 .pytest_cache/
 .mmdc_cache/
 .vitest/
+.playwright-cli/

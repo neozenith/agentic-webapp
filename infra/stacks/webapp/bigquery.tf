@@ -51,6 +51,27 @@ resource "google_bigquery_table" "llm_usage" {
   ])
 }
 
+# Extraction analytics: one row per structured extraction pulled from an asset by an
+# agent tool (written via ExtractionManager). The common envelope is typed columns; the
+# variable per-doc-type payload rides in fields_json, so new extraction tool types need
+# no schema change — query them with JSON_VALUE(fields_json, '$.field').
+resource "google_bigquery_table" "extractions" {
+  dataset_id          = google_bigquery_dataset.app.dataset_id
+  table_id            = "extractions"
+  deletion_protection = var.environment == "prod"
+
+  schema = jsonencode([
+    { name = "extraction_id", type = "STRING", mode = "REQUIRED" },
+    { name = "asset_id", type = "STRING", mode = "NULLABLE" },
+    { name = "doc_type", type = "STRING", mode = "NULLABLE" },
+    { name = "user_id", type = "STRING", mode = "NULLABLE" },
+    { name = "session_id", type = "STRING", mode = "NULLABLE" },
+    { name = "fields_json", type = "STRING", mode = "NULLABLE" },
+    { name = "model_id", type = "STRING", mode = "NULLABLE" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
 # Runtime SA can read/write rows in this dataset...
 resource "google_bigquery_dataset_iam_member" "runtime_data_editor" {
   dataset_id = google_bigquery_dataset.app.dataset_id

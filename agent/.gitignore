@@ -3,3 +3,5 @@ __pycache__/
 .env
 *.log
 tmp/
+# ADK's local session/artifact scratch (in-memory authoritative state lives in Firestore/GCS).
+.adk/

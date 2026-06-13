@@ -16,12 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from agentic_core.database import (
-    BigQueryDatabaseManager,
-    FirestoreDatabaseManager,
-    InMemoryDatabaseManager,
-    LlmUsageManager,
-)
+from agentic_core.database import LlmUsageManager, build_database_from_env
 from agentic_core.models import LlmUsageRecord
 from agentic_core.pricing import estimate_cost_usd
 
@@ -29,30 +24,10 @@ log = logging.getLogger(__name__)
 
 _MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash-lite")
 
-
-def _build_usage_manager() -> LlmUsageManager:
-    project = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
-    table = os.environ.get("LLM_USAGE_TABLE", "llm_usage")
-    backend = os.environ.get("DATABASE_BACKEND", "").lower()
-    firestore_db = os.environ.get("FIRESTORE_DATABASE")
-    dataset = os.environ.get("BIGQUERY_DATASET")
-
-    want_firestore = backend == "firestore" or (not backend and firestore_db)
-    want_bigquery = backend == "bigquery" or (not backend and dataset and not firestore_db)
-
-    if want_firestore and project and firestore_db:  # pragma: no cover — real Firestore client; covered by live deploy
-        log.info("LLM usage -> Firestore %s/%s table=%s", project, firestore_db, table)
-        return LlmUsageManager(FirestoreDatabaseManager(project=project, database=firestore_db), table=table)
-    if want_bigquery and project and dataset:  # pragma: no cover — real BQ client; covered by live deploy
-        log.info("LLM usage -> BigQuery %s.%s.%s", project, dataset, table)
-        return LlmUsageManager(BigQueryDatabaseManager(project=project, dataset=dataset), table=table)
-    log.warning(
-        "No durable DB configured (DATABASE_BACKEND/FIRESTORE_DATABASE/BIGQUERY_DATASET) — LLM usage in-memory only"
-    )
-    return LlmUsageManager(InMemoryDatabaseManager(), table=table)
-
-
-_USAGE = _build_usage_manager()
+# One env-driven backend selector for every analytics manager (see
+# agentic_core.database.build_database_from_env) — in-memory locally, Firestore/BigQuery
+# when configured. The usage inventory and the extraction store share it.
+_USAGE = LlmUsageManager(build_database_from_env(), table=os.environ.get("LLM_USAGE_TABLE", "llm_usage"))
 
 
 async def record_usage(callback_context: Any, llm_response: Any) -> None:  # ADK callback signature (untyped)
