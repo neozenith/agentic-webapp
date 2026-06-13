@@ -1,16 +1,19 @@
-"""Agent tools for working with stored assets and recording extractions.
+"""Agent tools for working with stored assets and recording analytics.
 
-Three tools, registered on root_agent:
-  - list_assets()            — discover stored assets (id, filename, type, size, date).
-  - AttachAssetTool          — attach_asset(asset_id): make an asset's image/PDF visible
-                               to the model THIS turn by injecting it inline. The bytes are
-                               re-fetched from the backend (GCS) on demand and NEVER saved to
-                               ADK's artifact store — our AssetService is the single source of
-                               truth (ADR-0006), which keeps the agent stateless / scale-to-zero
-                               safe and the asset view coherent with the web Asset Manager.
+Three function tools, registered on root_agent:
+  - list_assets()            — discover stored assets (id, filename, type, size, date,
+                               preview_url). The preview_url is a same-origin link the model
+                               can hand back to render the image in chat.
+  - attach_asset(asset_id)   — mark an asset to be shown to the model THIS turn. The actual
+                               inline injection happens in the before_model_callback
+                               (attachments.attach_referenced_assets), scoped to the current
+                               turn so stale attachments from earlier turns don't leak in.
   - record_extraction(...)   — persist structured details to the analytics store via the
-                               shared, backend-agnostic ExtractionManager (in-memory locally,
+                               backend-agnostic AnalyticsManager (in-memory locally,
                                Firestore/BigQuery when configured).
+
+Assets are sourced from the backend's AssetService (GCS) — the single source of truth — and
+never ADK's artifact store (ADR-0006).
 """
 
 from __future__ import annotations
@@ -22,117 +25,57 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.tool_context import ToolContext
-from google.genai import types
 
 from agentic_core.database import ExtractionManager, build_database_from_env
 from agentic_core.models import ExtractionRecord
 
 from . import assets_client
+from .attachments import note_tool_attachment
 
 log = logging.getLogger(__name__)
 
 _MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash-lite")
-_EXTRACTIONS = ExtractionManager(build_database_from_env())
-
-# Session-state key holding the asset_ids the model has attached this session. Stored in
-# tool_context.state, so it persists in the Firestore session and survives a cold start
-# (the images themselves are re-fetched from GCS, never persisted locally).
-_ATTACHED_KEY = "_attached_asset_ids"
+_ANALYTICS = ExtractionManager(build_database_from_env())
 
 
 # --- list_assets ------------------------------------------------------------------------
 
 
 async def list_assets() -> dict[str, Any]:
-    """List stored assets the user can reference (id, filename, content type, size, date).
+    """List stored assets the user can reference (id, filename, content type, size, date,
+    preview_url).
 
-    Call this to discover what assets exist before attaching one to read it.
+    Assets can share a filename (phone cameras reuse names), so identify a specific one by
+    its asset_id, and prefer the most recent when the user describes a new photo. The
+    preview_url is a link you can embed in a markdown image to show it in chat.
     """
     assets = await assets_client.list_assets()  # pragma: no cover — live HTTP to backend
     return {"assets": assets, "count": len(assets)}  # pragma: no cover — live HTTP to backend
 
 
-# --- attach_asset (transient inline injection; no artifact persistence) ------------------
+# --- attach_asset (records the asset for the current turn; injection in the callback) ----
 
 
-def _is_injectable(mime: str | None) -> bool:
-    """True if Gemini accepts this MIME type as inline data (image/audio/video/pdf)."""
-    m = (mime or "").split(";", 1)[0].strip().lower()
-    return m.startswith(("image/", "audio/", "video/")) or m == "application/pdf"
+def _invocation_id(tool_context: ToolContext) -> str:
+    ictx = getattr(tool_context, "_invocation_context", None)
+    return getattr(ictx, "invocation_id", "") or ""
 
 
-def _add_attached(state: Any, asset_id: str) -> list[str]:
-    """Append asset_id to the session-state attach list (dedup), return the new list."""
-    ids = list(state.get(_ATTACHED_KEY, []))
-    if asset_id not in ids:
-        ids.append(asset_id)
-    state[_ATTACHED_KEY] = ids
-    return ids
-
-
-class AttachAssetTool(BaseTool):
-    """Attaches a stored asset's bytes to the model inline, sourced from our AssetService
-    (GCS via the backend) — modelled on ADK's LoadArtifactsTool but deliberately NOT using
-    ADK's artifact store. The asset is re-fetched and injected per request (stateless)."""
-
-    def __init__(self) -> None:
-        super().__init__(
-            name="attach_asset",
-            description=(
-                "Attach a stored asset (a photo/scan/PDF, e.g. a receipt) so you can SEE its "
-                "contents and read details from it. Pass the asset_id from list_assets or from "
-                "the user's message. After attaching, the asset's image is visible to you."
-            ),
-        )
-
-    def _get_declaration(self) -> types.FunctionDeclaration:
-        return types.FunctionDeclaration(
-            name=self.name,
-            description=self.description,
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={"asset_id": types.Schema(type=types.Type.STRING)},
-                required=["asset_id"],
-            ),
-        )
-
-    async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
-        asset_id = args.get("asset_id", "")
-        if not asset_id:
-            return {"status": "error", "detail": "asset_id is required"}
-        _add_attached(tool_context.state, asset_id)
-        return {
-            "status": "attached",
-            "asset_id": asset_id,
-            "note": "The asset's contents are now visible to you in this turn.",
-        }
-
-    async def process_llm_request(  # pragma: no cover — live HTTP + model injection; covered by e2e
-        self, *, tool_context: ToolContext, llm_request: Any
-    ) -> None:
-        # Register the function declaration so the model can call attach_asset.
-        await super().process_llm_request(tool_context=tool_context, llm_request=llm_request)
-        # Inject every currently-attached asset inline, re-fetched from GCS (nothing persisted).
-        attached = tool_context.state.get(_ATTACHED_KEY, [])
-        for asset_id in attached:
-            try:
-                data, mime = await assets_client.fetch_content(asset_id)
-            except Exception:  # noqa: BLE001 — a missing asset must not break the reply
-                log.warning("attach_asset: could not fetch %s", asset_id)
-                continue
-            if not _is_injectable(mime):
-                continue
-            llm_request.contents.append(
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=f"Attached asset {asset_id}:"),
-                        types.Part.from_bytes(data=data, mime_type=mime),
-                    ],
-                )
-            )
+async def attach_asset(asset_id: str, tool_context: ToolContext) -> dict[str, Any]:
+    """Attach a stored asset (a photo/scan/PDF, e.g. a receipt or an odometer) so you can SEE
+    it this turn. Pass the asset_id from list_assets or from the user's message. The image
+    becomes visible to you; use it to read details from the document.
+    """
+    if not asset_id:
+        return {"status": "error", "detail": "asset_id is required"}
+    note_tool_attachment(tool_context.state, _invocation_id(tool_context), asset_id)
+    return {
+        "status": "attached",
+        "asset_id": asset_id,
+        "preview_url": assets_client.preview_url(asset_id),
+        "note": "The asset's contents are now visible to you in this turn.",
+    }
 
 
 # --- record_extraction ------------------------------------------------------------------
@@ -154,7 +97,7 @@ async def record_extraction(asset_id: str, doc_type: str, fields_json: str, tool
 
     Args:
       asset_id: the source asset the details came from.
-      doc_type: a short kind label, e.g. "fuel_receipt", "invoice".
+      doc_type: a short kind label, e.g. "fuel_receipt", "odometer", "invoice".
       fields_json: a JSON OBJECT string of the extracted key/values, e.g.
         '{"vendor":"Shell","total":"82.50","currency":"AUD","date":"2026-06-10"}'.
     """
@@ -171,6 +114,6 @@ async def record_extraction(asset_id: str, doc_type: str, fields_json: str, tool
         model_id=_MODEL,
         created_at=datetime.now(timezone.utc),
     )
-    await _EXTRACTIONS.record(record)
-    log.info("extraction recorded: %s doc_type=%s fields=%d", record.extraction_id, doc_type, len(fields))
+    await _ANALYTICS.record(record)
+    log.info("analytics recorded: %s doc_type=%s fields=%d", record.extraction_id, doc_type, len(fields))
     return {"status": "recorded", "extraction_id": record.extraction_id, "doc_type": doc_type, "fields": fields}

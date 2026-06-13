@@ -22,14 +22,22 @@ BACKEND_BASE_URL = os.environ.get("BACKEND_BASE_URL", "http://localhost:8080")
 _TIMEOUT = httpx.Timeout(15.0)
 
 
+def preview_url(asset_id: str) -> str:
+    """Same-origin URL the SPA can render as an <img> (the backend proxies GCS bytes)."""
+    return f"/api/assets/{asset_id}/content"
+
+
 def _summarise(asset: dict[str, Any]) -> dict[str, Any]:
     """Compact a backend AssetMetadata dict down to what the model needs to choose one."""
+    asset_id = asset.get("asset_id")
     return {
-        "asset_id": asset.get("asset_id"),
+        "asset_id": asset_id,
         "filename": asset.get("filename"),
         "content_type": asset.get("content_type"),
         "size_bytes": asset.get("size_bytes"),
         "created_at": asset.get("created_at"),
+        # A servable link the agent can hand back to render a preview in chat.
+        "preview_url": preview_url(asset_id) if asset_id else None,
     }
 
 

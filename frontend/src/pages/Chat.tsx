@@ -2,6 +2,7 @@ import { Paperclip, SendHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { Markdown } from "@/components/Markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { type ChatMessage, createSession, getMe, getSession, runAgent, sessionTo
 interface Attached {
   asset_id: string;
   filename: string | null;
+  content_type: string | null;
 }
 
 export function Chat() {
@@ -75,7 +77,7 @@ export function Chat() {
     setError(null);
     try {
       const asset = await uploadAsset(files[0]);
-      setAttached({ asset_id: asset.asset_id, filename: asset.filename });
+      setAttached({ asset_id: asset.asset_id, filename: asset.filename, content_type: asset.content_type });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -139,11 +141,13 @@ export function Chat() {
             </span>
             <div
               className={cn(
-                "max-w-[80%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5",
-                m.role === "user" ? "bg-secondary text-secondary-foreground" : "border border-border bg-background/60",
+                "max-w-[80%] rounded-xl px-3.5 py-2.5",
+                m.role === "user"
+                  ? "whitespace-pre-wrap bg-secondary text-secondary-foreground"
+                  : "border border-border bg-background/60",
               )}
             >
-              {m.text}
+              {m.role === "assistant" ? <Markdown>{m.text}</Markdown> : m.text}
             </div>
           </div>
         ))}
@@ -158,8 +162,17 @@ export function Chat() {
       </div>
       {error && <p className="text-destructive">⚠️ {error}</p>}
       {attached && (
-        <div className="flex w-fit items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 text-sm">
-          <Paperclip className="size-3.5 text-muted-foreground" aria-hidden />
+        <div className="flex w-fit items-center gap-2 rounded-md border border-border bg-muted/40 p-1.5 pr-2 text-sm">
+          {attached.content_type?.startsWith("image/") ? (
+            // Thumbnail of the stored asset (served from GCS) so you can confirm the right image.
+            <img
+              src={`/api/assets/${attached.asset_id}/content`}
+              alt={attached.filename ?? "attachment"}
+              className="size-12 rounded object-cover"
+            />
+          ) : (
+            <Paperclip className="size-3.5 text-muted-foreground" aria-hidden />
+          )}
           <span className="truncate">{attached.filename ?? attached.asset_id}</span>
           <button
             type="button"

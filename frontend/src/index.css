@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* Dark-first: <html class="dark"> is always set (see index.html). The palette below
    is ported from the original hand-rolled theme — slate surfaces, teal accent. */
