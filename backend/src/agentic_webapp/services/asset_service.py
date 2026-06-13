@@ -16,6 +16,10 @@ from agentic_core.storage import StorageManager
 
 log = logging.getLogger(__name__)
 
+# Aliased at module scope so annotations don't resolve `list[...]` to AssetService.list
+# (the method shadows the builtin inside the class body — same reason base.py has `Rows`).
+AssetList = list[AssetMetadata]
+
 
 class AssetService:
     def __init__(
@@ -40,6 +44,7 @@ class AssetService:
         filename: str | None = None,
         content_type: str | None = None,
         tags: dict[str, str] | None = None,
+        owner_id: str | None = None,
     ) -> AssetMetadata:
         """Store the bytes AND record their metadata. Returns the catalogue record."""
         asset_id = uuid4().hex
@@ -54,17 +59,47 @@ class AssetService:
             size_bytes=stored.size if stored.size is not None else len(data),
             created_at=now,
             updated_at=now,
+            owner_id=owner_id,
             tags=tags or {},
         )
         await self._metadata.record(meta)
-        log.info("stored asset %s (%s, %s bytes)", asset_id, meta.content_type, meta.size_bytes)
+        log.info("stored asset %s owner=%s (%s, %s bytes)", asset_id, owner_id, meta.content_type, meta.size_bytes)
         return meta
+
+    # --- RBAC: ownership + sharing ---
+
+    @staticmethod
+    def can_access(meta: AssetMetadata, viewer_id: str | None, *, is_admin: bool) -> bool:
+        """An asset is visible to admins, to its owner, to anyone it's shared with, and (for
+        backward-compat) to everyone if it has no owner (legacy/unowned)."""
+        if is_admin or meta.owner_id is None:
+            return True
+        if viewer_id is None:
+            return False
+        return meta.owner_id == viewer_id or viewer_id in (meta.shared_with or [])
 
     async def get(self, asset_id: str) -> AssetMetadata | None:
         return await self._metadata.get(asset_id)
 
     async def list(self, *, limit: int = 100) -> list[AssetMetadata]:
         return await self._metadata.list(limit=limit)
+
+    async def list_visible(self, viewer_id: str | None, *, is_admin: bool, limit: int = 100) -> AssetList:
+        """The assets the viewer may see (owned + shared + unowned, or all if admin)."""
+        return [m for m in await self._metadata.list(limit=limit) if self.can_access(m, viewer_id, is_admin=is_admin)]
+
+    async def share(
+        self, asset_id: str, *, actor_id: str | None, is_admin: bool, with_user_ids: Sequence[str]
+    ) -> AssetMetadata | None:
+        """Grant other users access to an asset. Only the owner or an admin may share."""
+        meta = await self._metadata.get(asset_id)
+        if meta is None:
+            return None
+        if not is_admin and (actor_id is None or meta.owner_id != actor_id):
+            raise PermissionError("only the owner or an admin may share this asset")
+        meta.shared_with = sorted(set(meta.shared_with or []) | {u for u in with_user_ids if u})
+        await self._metadata.update(meta)
+        return meta
 
     async def signed_url(self, asset_id: str) -> str | None:
         meta = await self._metadata.get(asset_id)

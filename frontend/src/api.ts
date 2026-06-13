@@ -180,6 +180,19 @@ export interface Asset {
   content_type: string | null;
   size_bytes: number | null;
   created_at: string;
+  owner_id?: string | null;
+  shared_with?: string[];
+}
+
+/** Share an asset with other users (by email). Owner or admin only (server-enforced). */
+export async function shareAsset(assetId: string, emails: string[]): Promise<Asset> {
+  const resp = await apiFetch(`/api/assets/${assetId}/share`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ emails }),
+  });
+  if (!resp.ok) throw new Error(`share error ${resp.status}`);
+  return resp.json();
 }
 
 export async function listAssets(limit = 100): Promise<Asset[]> {

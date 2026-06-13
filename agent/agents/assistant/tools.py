@@ -44,15 +44,15 @@ _ANALYTICS = AnalyticsManager(build_analytics_database_from_env())
 # --- list_assets ------------------------------------------------------------------------
 
 
-async def list_assets() -> dict[str, Any]:
+async def list_assets(tool_context: ToolContext) -> dict[str, Any]:
     """List stored assets the user can reference (id, filename, content type, size, date,
-    preview_url).
+    preview_url). Only assets the user owns or that are shared with them are returned.
 
     Assets can share a filename (phone cameras reuse names), so identify a specific one by
     its asset_id, and prefer the most recent when the user describes a new photo. The
     preview_url is a link you can embed in a markdown image to show it in chat.
     """
-    assets = await assets_client.list_assets()  # pragma: no cover — live HTTP to backend
+    assets = await assets_client.list_assets(viewer_id=_viewer_id(tool_context))  # pragma: no cover — live HTTP
     return {"assets": assets, "count": len(assets)}  # pragma: no cover — live HTTP to backend
 
 
@@ -62,6 +62,13 @@ async def list_assets() -> dict[str, Any]:
 def _invocation_id(tool_context: ToolContext) -> str:
     ictx = getattr(tool_context, "_invocation_context", None)
     return getattr(ictx, "invocation_id", "") or ""
+
+
+def _viewer_id(tool_context: ToolContext) -> str | None:
+    """The chat user's pseudonymous id — passed to the backend so asset visibility is
+    scoped to them (it equals the asset owner_id minted from the same identity)."""
+    ictx = getattr(tool_context, "_invocation_context", None)
+    return getattr(getattr(ictx, "session", None), "user_id", None)
 
 
 async def attach_asset(asset_id: str, tool_context: ToolContext) -> dict[str, Any]:

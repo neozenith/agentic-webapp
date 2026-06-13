@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Asset } from "../api";
 import { AssetTree } from "./AssetTree";
@@ -18,6 +18,32 @@ const ASSETS: Asset[] = [
   asset({ asset_id: "a1", filename: "logo.png", content_type: "image/png", size_bytes: 2048 }),
   asset({ asset_id: "a2", filename: "reports/q1.pdf", content_type: "application/pdf", size_bytes: 500 }),
 ];
+
+describe("AssetTree ownership + sharing", () => {
+  const owned: Asset[] = [
+    asset({ asset_id: "mine", filename: "mine.png", content_type: "image/png", owner_id: "me" }),
+    asset({ asset_id: "theirs", filename: "theirs.png", content_type: "image/png", owner_id: "other" }),
+  ];
+
+  it("badges your assets and (for admins) shows the owner of others, with a share action", async () => {
+    const onShare = vi.fn();
+    render(<AssetTree assets={owned} viewerId="me" isAdmin onShare={onShare} />);
+    expect(screen.getByText("you")).toBeInTheDocument(); // your own asset
+    expect(screen.getByText(/owner other/)).toBeInTheDocument(); // admin sees the other owner
+    await userEvent.click(screen.getByRole("button", { name: /Share mine\.png/i }));
+    expect(onShare).toHaveBeenCalledWith(expect.objectContaining({ asset_id: "mine" }));
+  });
+
+  it("marks shared-with-you assets and hides others' owners from non-admins", () => {
+    const shared = [
+      asset({ asset_id: "s", filename: "s.png", content_type: "image/png", owner_id: "other", shared_with: ["me"] }),
+    ];
+    render(<AssetTree assets={shared} viewerId="me" isAdmin={false} />);
+    expect(screen.getByText("shared")).toBeInTheDocument();
+    // non-admin, non-owner: no share button
+    expect(screen.queryByRole("button", { name: /Share/i })).not.toBeInTheDocument();
+  });
+});
 
 describe("AssetTree", () => {
   it("renders category folders open by default, linking files to their content", () => {

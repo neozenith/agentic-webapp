@@ -1,5 +1,5 @@
-import { ChevronRight, Folder, FolderOpen } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, Folder, FolderOpen, Share2 } from "lucide-react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,28 @@ const MODES: { value: ViewMode; label: string }[] = [
 const INDENT = 16; // px per depth level
 const fmtDate = (iso: string): string => new Date(iso).toLocaleDateString();
 
+// Viewer context so ownership/share controls don't have to prop-drill through the recursion.
+interface OwnerCtx {
+  viewerId: string | null;
+  isAdmin: boolean;
+  onShare?: (asset: Asset) => void;
+}
+const OwnerContext = createContext<OwnerCtx>({ viewerId: null, isAdmin: false });
+
+function OwnerBadge({ asset }: { asset: Asset }) {
+  const { viewerId, isAdmin } = useContext(OwnerContext);
+  if (!asset.owner_id) return null; // legacy/unowned
+  if (asset.owner_id === viewerId) return <Badge variant="outline">you</Badge>;
+  if (viewerId && asset.shared_with?.includes(viewerId)) return <Badge variant="muted">shared</Badge>;
+  // Admin viewing someone else's asset: surface the (pseudonymous) owner.
+  if (isAdmin) return <Badge variant="muted">owner {asset.owner_id.slice(0, 8)}…</Badge>;
+  return null;
+}
+
 function FileRow({ asset, depth }: { asset: Asset; depth: number }) {
+  const { viewerId, isAdmin, onShare } = useContext(OwnerContext);
   const Icon = iconFor(asset.content_type);
+  const canShare = !!onShare && (isAdmin || (!!asset.owner_id && asset.owner_id === viewerId));
   return (
     <div
       className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60"
@@ -32,6 +52,19 @@ function FileRow({ asset, depth }: { asset: Asset; depth: number }) {
       >
         {displayName(asset)}
       </a>
+      <OwnerBadge asset={asset} />
+      {canShare && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          aria-label={`Share ${displayName(asset)}`}
+          onClick={() => onShare?.(asset)}
+        >
+          <Share2 className="size-3.5" />
+        </Button>
+      )}
       <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">{fmtSize(asset.size_bytes)}</span>
       <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:inline">
         {fmtDate(asset.created_at)}
@@ -102,7 +135,17 @@ function TreeLevel({
   );
 }
 
-export function AssetTree({ assets }: { assets: Asset[] }) {
+export function AssetTree({
+  assets,
+  viewerId = null,
+  isAdmin = false,
+  onShare,
+}: {
+  assets: Asset[];
+  viewerId?: string | null;
+  isAdmin?: boolean;
+  onShare?: (asset: Asset) => void;
+}) {
   const [mode, setMode] = useState<ViewMode>("type");
   const tree = useMemo(() => buildTree(assets, mode), [assets, mode]);
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -140,9 +183,11 @@ export function AssetTree({ assets }: { assets: Asset[] }) {
           ))}
         </div>
       </div>
-      <div className="rounded-lg border border-border bg-card/40 p-1.5">
-        <TreeLevel folders={tree.folders} files={tree.files} depth={0} open={open} toggle={toggle} />
-      </div>
+      <OwnerContext.Provider value={{ viewerId, isAdmin, onShare }}>
+        <div className="rounded-lg border border-border bg-card/40 p-1.5">
+          <TreeLevel folders={tree.folders} files={tree.files} depth={0} open={open} toggle={toggle} />
+        </div>
+      </OwnerContext.Provider>
     </div>
   );
 }

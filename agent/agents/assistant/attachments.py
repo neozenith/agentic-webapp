@@ -42,6 +42,12 @@ def _invocation_id(ctx: Any) -> str:
     return getattr(ictx, "invocation_id", "") or getattr(ctx, "invocation_id", "") or ""
 
 
+def _invocation_id_user(ctx: Any) -> str | None:
+    """The chat user's pseudonymous id, for scoping the backend asset fetch to them."""
+    ictx = getattr(ctx, "_invocation_context", None)
+    return getattr(getattr(ictx, "session", None), "user_id", None)
+
+
 def is_injectable(mime: str | None) -> bool:
     m = (mime or "").split(";", 1)[0].strip().lower()
     return m.startswith(_INJECTABLE) or m == "application/pdf"
@@ -91,9 +97,10 @@ async def attach_referenced_assets(callback_context: Any, llm_request: Any) -> N
     """before_model_callback: inject the current turn's assets inline. Returns None so the
     model still runs. Never raises — a missing asset must not break the reply."""
     ids = ids_for_turn(callback_context, llm_request)
+    viewer_id = _invocation_id_user(callback_context)
     for asset_id in ids:  # pragma: no cover — live HTTP + injection; covered by e2e
         try:
-            data, mime = await assets_client.fetch_content(asset_id)
+            data, mime = await assets_client.fetch_content(asset_id, viewer_id=viewer_id)
         except Exception:  # noqa: BLE001
             log.warning("attach: could not fetch %s", asset_id)
             continue

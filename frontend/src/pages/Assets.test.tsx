@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
-
+import { AuthProvider } from "../components/auth";
 import { server } from "../test/server";
 import { Assets } from "./Assets";
 
@@ -39,7 +39,7 @@ describe("Assets", () => {
         ]),
       ),
     );
-    render(<Assets />);
+    render(<Assets />, { wrapper: AuthProvider });
     // Category folders are open by default, so files are visible as content links.
     expect(await screen.findByRole("link", { name: "pic.png" })).toHaveAttribute("href", "/api/assets/a1/content");
     expect(screen.getByText("2.0 KB")).toBeInTheDocument(); // KB branch
@@ -54,20 +54,20 @@ describe("Assets", () => {
         ]),
       ),
     );
-    render(<Assets />);
+    render(<Assets />, { wrapper: AuthProvider });
     expect(await screen.findByRole("link", { name: "a3" })).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument(); // null size
   });
 
   it("shows an empty state when there are no assets", async () => {
     server.use(http.get("/api/assets", () => HttpResponse.json([])));
-    render(<Assets />);
+    render(<Assets />, { wrapper: AuthProvider });
     expect(await screen.findByText(/No assets uploaded/i)).toBeInTheDocument();
   });
 
   it("surfaces an error", async () => {
     server.use(http.get("/api/assets", () => new HttpResponse(null, { status: 500 })));
-    render(<Assets />);
+    render(<Assets />, { wrapper: AuthProvider });
     expect(await screen.findByText(/assets error 500/i)).toBeInTheDocument();
   });
 
@@ -82,7 +82,7 @@ describe("Assets", () => {
   it("uploads a photo via the button and shows it after the list refetches", async () => {
     server.use(...statefulAssets(asset));
     const user = userEvent.setup();
-    const { container } = render(<Assets />);
+    const { container } = render(<Assets />, { wrapper: AuthProvider });
     await screen.findByText(/No assets uploaded/i); // initially empty
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(input, new File(["png"], "receipt.png", { type: "image/png" }));
@@ -92,7 +92,7 @@ describe("Assets", () => {
 
   it("uploads a photo via drag-and-drop onto the tree", async () => {
     server.use(...statefulAssets(asset));
-    const { container } = render(<Assets />);
+    const { container } = render(<Assets />, { wrapper: AuthProvider });
     await screen.findByText(/No assets uploaded/i);
     const zone = container.querySelector(".border-dashed") as HTMLElement;
     const file = new File(["png"], "receipt.png", { type: "image/png" });

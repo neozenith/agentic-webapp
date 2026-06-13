@@ -34,6 +34,13 @@ class AssetMetadataManager:
     async def delete(self, asset_id: str) -> None:
         await self._db.delete(self._table, key_field="asset_id", key=asset_id)
 
+    async def update(self, meta: AssetMetadata) -> AssetMetadata:
+        """Replace a record (e.g. after a share/ownership change). The generic DatabaseManager
+        has no upsert, so this is delete-then-insert keyed on asset_id."""
+        await self._db.delete(self._table, key_field="asset_id", key=meta.asset_id)
+        await self._db.insert(self._table, [self._to_row(meta)])
+        return meta
+
     # --- Row <-> model mapping (the table schema lives here) ---
 
     @staticmethod
@@ -46,6 +53,8 @@ class AssetMetadataManager:
             "size_bytes": meta.size_bytes,
             "created_at": meta.created_at.isoformat(),
             "updated_at": meta.updated_at.isoformat(),
+            "owner_id": meta.owner_id,
+            "shared_with_json": json.dumps(meta.shared_with or []),
             # Nested tags are flattened to a JSON string so the table schema stays
             # simple and portable across backends.
             "metadata_json": json.dumps(meta.tags or {}),
@@ -55,6 +64,8 @@ class AssetMetadataManager:
     def _from_row(row: Row) -> AssetMetadata:
         raw_tags = row.get("metadata_json")
         tags = json.loads(raw_tags) if isinstance(raw_tags, str) and raw_tags else (raw_tags or {})
+        raw_shared = row.get("shared_with_json")
+        shared = json.loads(raw_shared) if isinstance(raw_shared, str) and raw_shared else (raw_shared or [])
         return AssetMetadata(
             asset_id=row["asset_id"],
             storage_key=row["storage_key"],
@@ -63,5 +74,7 @@ class AssetMetadataManager:
             size_bytes=row.get("size_bytes"),
             created_at=row["created_at"],  # pydantic coerces str|datetime
             updated_at=row["updated_at"],
+            owner_id=row.get("owner_id"),
+            shared_with=shared,
             tags=tags,
         )

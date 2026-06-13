@@ -26,6 +26,9 @@ resource "google_bigquery_table" "asset_metadata" {
     { name = "size_bytes", type = "INTEGER", mode = "NULLABLE" },
     { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
     { name = "updated_at", type = "TIMESTAMP", mode = "NULLABLE" },
+    # RBAC: pseudonymous owner + JSON array of user_ids the asset is shared with.
+    { name = "owner_id", type = "STRING", mode = "NULLABLE" },
+    { name = "shared_with_json", type = "STRING", mode = "NULLABLE" },
     { name = "metadata_json", type = "STRING", mode = "NULLABLE" },
   ])
 }

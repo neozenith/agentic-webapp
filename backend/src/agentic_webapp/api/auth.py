@@ -13,8 +13,12 @@ from fastapi import HTTPException, Request
 
 from .. import rbac
 from ..config import get_settings
+from ..identity import mask_user_id
 
 IAP_USER_HEADER = "x-goog-authenticated-user-email"
+# Internal-only: the agent sidecar (no IAP email) passes the chat user's pseudonymous id
+# so asset visibility is scoped to that user. Same-pod localhost call; never an admin.
+INTERNAL_VIEWER_HEADER = "x-viewer-user-id"
 
 
 def iap_email(request: Request) -> str | None:
@@ -31,6 +35,16 @@ def iap_email(request: Request) -> str | None:
 def current_roles(request: Request) -> list[str]:
     s = get_settings()
     return rbac.roles_for(iap_email(request), environment=s.environment, user_roles=s.rbac_user_roles)
+
+
+def viewer(request: Request) -> tuple[str | None, bool]:
+    """(viewer_user_id, is_admin) for asset visibility. From the IAP email (pseudonymised)
+    in the normal path; from the trusted internal header for the agent's on-behalf calls
+    (never admin); (None, False) when there's no identity."""
+    email = iap_email(request)
+    if email:
+        return mask_user_id(email), "admin" in current_roles(request)
+    return request.headers.get(INTERNAL_VIEWER_HEADER) or None, False
 
 
 def require_area(area: str) -> Callable[[Request], Awaitable[None]]:

@@ -2,12 +2,14 @@ import { Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AssetTree } from "@/components/AssetTree";
+import { useAuth } from "@/components/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { type Asset, listAssets, uploadAsset } from "../api";
+import { type Asset, listAssets, shareAsset, uploadAsset } from "../api";
 
 export function Assets() {
+  const { me } = useAuth();
   const [assets, setAssets] = useState<Asset[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -18,6 +20,17 @@ export function Assets() {
     listAssets()
       .then(setAssets)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+
+  async function share(asset: Asset) {
+    const email = window.prompt(`Share "${asset.filename ?? asset.asset_id}" with which email?`);
+    if (!email) return;
+    try {
+      await shareAsset(asset.asset_id, [email]);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   // Mount-only load (matches the other pages' inline pattern; refresh() is reused after upload).
   useEffect(() => {
@@ -83,7 +96,12 @@ export function Assets() {
               No assets uploaded yet. Drop a photo here or use “Upload photo”.
             </p>
           ) : (
-            <AssetTree assets={assets} />
+            <AssetTree
+              assets={assets}
+              viewerId={me?.user_id ?? null}
+              isAdmin={!!me?.roles?.includes("admin")}
+              onShare={share}
+            />
           )}
         </div>
       </CardContent>

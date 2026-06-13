@@ -27,6 +27,10 @@ class AssetMetadata(BaseModel):
     size_bytes: int | None = None
     created_at: datetime
     updated_at: datetime
+    # RBAC: the pseudonymous user_id of the uploader (None = legacy/unowned, visible to all),
+    # and the user_ids it has been shared with. Admins see every asset regardless.
+    owner_id: str | None = None
+    shared_with: list[str] = Field(default_factory=list)
     # Arbitrary, app-defined key/values. Kept generic on purpose.
     tags: dict[str, str] = Field(default_factory=dict)
 
