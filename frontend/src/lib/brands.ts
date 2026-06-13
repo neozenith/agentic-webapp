@@ -125,9 +125,9 @@ const buildBrand = (manifestPath: string, manifest: BrandManifest): Brand => {
 const _brandsByDiscovery: Brand[] = Object.entries(manifestModules)
   .map(([path, manifest]) => buildBrand(path, manifest))
   .sort((a, b) => {
-    // default-v2ai always first; then alphabetical by id.
-    if (a.id === "default-v2ai") return -1;
-    if (b.id === "default-v2ai") return 1;
+    // joshs-karaoke-bar is the pinned default (brands[0]); then alphabetical by id.
+    if (a.id === "joshs-karaoke-bar") return -1;
+    if (b.id === "joshs-karaoke-bar") return 1;
     return a.id.localeCompare(b.id);
   });
 
@@ -137,7 +137,7 @@ if (_brandsByDiscovery.length === 0) {
 
 export const BRANDS: readonly Brand[] = _brandsByDiscovery;
 
-export const DEFAULT_BRAND_ID = BRANDS[0]?.id ?? "default-v2ai";
+export const DEFAULT_BRAND_ID = BRANDS[0]?.id ?? "joshs-karaoke-bar";
 
 export const findBrand = (id: string, brands: readonly Brand[] = BRANDS): Brand | undefined =>
   brands.find((b) => b.id === id);

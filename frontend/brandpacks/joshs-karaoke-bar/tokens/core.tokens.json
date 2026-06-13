@@ -1,0 +1,61 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"$description": "Core (reference) tokens for Josh's Karaoke Bar. Source: BRAND_GUIDELINES.md (https://joshpeak.net/joshs-karaoke-bar/). Urban Tokyo-meets-Melbourne karaoke bar: neon magenta primary, electric blue secondary, neon yellow accent, deep-purple/charcoal nightclub surfaces. Bebas Neue display + Inter body. W3C DTCG format.",
+	"color": {
+		"$type": "color",
+		"magenta": {
+			"400": { "$value": "#E91E63" }
+		},
+		"blue": {
+			"400": { "$value": "#00D4FF" }
+		},
+		"yellow": {
+			"400": { "$value": "#FFD700" }
+		},
+		"purple": {
+			"900": { "$value": "#1A1625" }
+		},
+		"charcoal": {
+			"600": { "$value": "#3A3650" },
+			"700": { "$value": "#2D2A3A" }
+		},
+		"gray": {
+			"100": { "$value": "#F5F5F5" },
+			"200": { "$value": "#ECECEC" },
+			"300": { "$value": "#D8D8DE" },
+			"400": { "$value": "#B8B8B8" },
+			"500": { "$value": "#5A5766" }
+		},
+		"red": { "500": { "$value": "#EF4444" } },
+		"white": { "$value": "#FFFFFF" },
+		"black": { "$value": "#000000" }
+	},
+	"radius": {
+		"$type": "dimension",
+		"base": { "$value": "0.5rem" }
+	},
+	"font": {
+		"sans": {
+			"$type": "fontFamily",
+			"$value": [
+				"Inter",
+				"ui-sans-serif",
+				"system-ui",
+				"-apple-system",
+				"Segoe UI",
+				"Roboto",
+				"sans-serif"
+			]
+		},
+		"display": {
+			"$type": "fontFamily",
+			"$value": [
+				"Bebas Neue",
+				"Inter",
+				"ui-sans-serif",
+				"system-ui",
+				"sans-serif"
+			]
+		}
+	}
+}

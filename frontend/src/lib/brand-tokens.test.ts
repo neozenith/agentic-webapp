@@ -78,8 +78,13 @@ describe("tokenPathToCssVar", () => {
     expect(tokenPathToCssVar("radius.base")).toBe("--radius");
   });
 
+  it("maps font.sans / font.display to the live font vars", () => {
+    expect(tokenPathToCssVar("font.sans")).toBe("--font-sans");
+    expect(tokenPathToCssVar("font.display")).toBe("--font-display");
+  });
+
   it("returns null for paths it doesn't recognise", () => {
-    expect(tokenPathToCssVar("font.sans")).toBeNull();
+    expect(tokenPathToCssVar("font.mono")).toBeNull();
     expect(tokenPathToCssVar("radius.lg")).toBeNull();
   });
 });
@@ -89,20 +94,27 @@ describe("applyTokensToRoot", () => {
     document.documentElement.removeAttribute("style");
   });
 
-  it("writes known vars onto <html> and the cleanup removes exactly those", () => {
+  it("writes known vars (incl. live fonts) onto <html> and the cleanup removes exactly those", () => {
     const cleanup = applyTokensToRoot({
       "color.primary": "#FEC40E",
       "radius.base": "0.5rem",
-      "font.sans": "Outfit", // unknown shape — must be skipped, not written
+      "font.sans": "Inter, sans-serif", // now mapped → --font-sans
+      "font.display": "Bebas Neue, sans-serif", // now mapped → --font-display
+      "spacing.lg": "2rem", // genuinely unknown shape — must be skipped
     });
     const root = document.documentElement;
     expect(root.style.getPropertyValue("--primary")).toBe("#FEC40E");
     expect(root.style.getPropertyValue("--radius")).toBe("0.5rem");
-    expect(root.style.getPropertyValue("--sans")).toBe("");
+    expect(root.style.getPropertyValue("--font-sans")).toBe("Inter, sans-serif");
+    expect(root.style.getPropertyValue("--font-display")).toBe("Bebas Neue, sans-serif");
+    // Unknown shapes are still skipped, not written under a guessed name.
+    expect(root.style.getPropertyValue("--lg")).toBe("");
 
     cleanup();
     expect(root.style.getPropertyValue("--primary")).toBe("");
     expect(root.style.getPropertyValue("--radius")).toBe("");
+    expect(root.style.getPropertyValue("--font-sans")).toBe("");
+    expect(root.style.getPropertyValue("--font-display")).toBe("");
   });
 });
 

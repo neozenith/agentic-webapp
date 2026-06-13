@@ -1,0 +1,26 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"$description": "Semantic tokens for Josh's Karaoke Bar LIGHT mode. Off-white #F5F5F5 background, deep-purple foreground, white elevated surfaces — keeps the same neon magenta primary / electric blue secondary / neon yellow accent so the brand reads consistently across themes. Names match this app's shadcn/ui CSS variable set 1:1 (no sidebar-* / chart-*).",
+	"color": {
+		"$type": "color",
+		"background": { "$value": "{color.gray.100}" },
+		"foreground": { "$value": "{color.purple.900}" },
+		"card": { "$value": "{color.white}" },
+		"card-foreground": { "$value": "{color.purple.900}" },
+		"popover": { "$value": "{color.white}" },
+		"popover-foreground": { "$value": "{color.purple.900}" },
+		"primary": { "$value": "{color.magenta.400}" },
+		"primary-foreground": { "$value": "{color.white}" },
+		"secondary": { "$value": "{color.blue.400}" },
+		"secondary-foreground": { "$value": "{color.purple.900}" },
+		"muted": { "$value": "{color.gray.200}" },
+		"muted-foreground": { "$value": "{color.gray.500}" },
+		"accent": { "$value": "{color.yellow.400}" },
+		"accent-foreground": { "$value": "{color.purple.900}" },
+		"destructive": { "$value": "{color.red.500}" },
+		"destructive-foreground": { "$value": "{color.white}" },
+		"border": { "$value": "{color.gray.300}" },
+		"input": { "$value": "{color.gray.300}" },
+		"ring": { "$value": "{color.magenta.400}" }
+	}
+}

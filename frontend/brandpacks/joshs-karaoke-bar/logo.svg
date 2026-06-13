@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" width="280" height="64" role="img" aria-label="Josh's Karaoke Bar">
+  <text x="140" y="36" text-anchor="middle" textLength="248" lengthAdjust="spacingAndGlyphs"
+        font-family="'Bebas Neue','Oswald','Arial Narrow',sans-serif" font-weight="700"
+        font-size="34" letter-spacing="2" fill="#1A1625">JOSH'S KARAOKE BAR</text>
+  <rect x="16" y="46" width="248" height="3" rx="1.5" fill="#E91E63"/>
+</svg>
