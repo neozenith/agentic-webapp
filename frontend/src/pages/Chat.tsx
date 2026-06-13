@@ -15,6 +15,31 @@ interface Attached {
   content_type: string | null;
 }
 
+// Asset references the composer embeds, e.g. "[attached asset 3f9a… — IMG_1.jpg]".
+// The id is whatever the server minted (a uuid hex in practice); match any id token.
+const ATTACH_RE = /\[attached asset ([0-9a-zA-Z_-]{6,})(?:\s+—\s+([^\]]*))?\]/g;
+
+/** Render a user message: any embedded asset reference becomes an inline image preview
+ * (served from GCS), with the reference text stripped from the prose. */
+function UserMessage({ text }: { text: string }) {
+  const refs = [...text.matchAll(ATTACH_RE)];
+  const clean = text.replace(ATTACH_RE, "").trim();
+  return (
+    <div className="flex flex-col gap-2">
+      {refs.map((m, i) => (
+        <img
+          // biome-ignore lint/suspicious/noArrayIndexKey: a message's attachments are fixed and never reordered
+          key={`${m[1]}-${i}`}
+          src={`/api/assets/${m[1]}/content`}
+          alt={m[2]?.trim() || "attachment"}
+          className="max-h-56 rounded-md border border-border"
+        />
+      ))}
+      {clean && <div className="whitespace-pre-wrap">{clean}</div>}
+    </div>
+  );
+}
+
 export function Chat() {
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
@@ -94,11 +119,12 @@ export function Chat() {
       ? `\n\n[attached asset ${attached.asset_id}${attached.filename ? ` — ${attached.filename}` : ""}]`
       : "";
     const outgoing = `${text}${ref}`.trim();
-    const shown = text || (attached ? `📎 ${attached.filename ?? attached.asset_id}` : "");
     setInput("");
     setAttached(null);
     setError(null);
-    setMessages((m) => [...m, { role: "user", text: shown }]);
+    // Store the message WITH the asset reference so the image preview renders identically
+    // live and on resume (the bytes stay in GCS — the reference is the single source of truth).
+    setMessages((m) => [...m, { role: "user", text: outgoing }]);
     setBusy(true);
     try {
       const reply = await runAgent(userId, sessionId, outgoing);
@@ -147,7 +173,7 @@ export function Chat() {
                   : "border border-border bg-background/60",
               )}
             >
-              {m.role === "assistant" ? <Markdown>{m.text}</Markdown> : m.text}
+              {m.role === "assistant" ? <Markdown>{m.text}</Markdown> : <UserMessage text={m.text} />}
             </div>
           </div>
         ))}

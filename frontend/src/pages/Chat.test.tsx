@@ -152,6 +152,12 @@ describe("Chat", () => {
     // The agent received the typed text PLUS a parseable asset reference.
     expect(sentText).toContain("read this receipt");
     expect(sentText).toContain("asset-9");
+    // The sent user message keeps an inline image preview of the attachment (the bug fix).
+    const preview = await screen.findByRole("img", { name: "receipt.png" });
+    expect(preview).toHaveAttribute("src", "/api/assets/asset-9/content");
+    // …and the typed prose still shows, without the raw "[attached asset …]" reference.
+    expect(screen.getByText("read this receipt")).toBeInTheDocument();
+    expect(screen.queryByText(/\[attached asset/)).not.toBeInTheDocument();
   });
 
   it("starts a new chat via the New chat button", async () => {
