@@ -92,7 +92,7 @@ def _extract_ctx(user: str = "alice", sid: str = "s1") -> SimpleNamespace:
 
 
 def test_record_extraction_writes_a_row():
-    before = len(asyncio.run(tools._ANALYTICS.list()))
+    before = len(asyncio.run(tools._ANALYTICS.list_extractions()))
     out = asyncio.run(
         tools.record_extraction(
             asset_id="a1",
@@ -102,7 +102,7 @@ def test_record_extraction_writes_a_row():
         )
     )
     assert out["status"] == "recorded"
-    rows = asyncio.run(tools._ANALYTICS.list())
+    rows = asyncio.run(tools._ANALYTICS.list_extractions())
     assert len(rows) == before + 1
     latest = rows[0]
     assert latest.user_id == "alice"

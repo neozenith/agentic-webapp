@@ -52,7 +52,8 @@ resource "google_bigquery_table" "llm_usage" {
 }
 
 # Extraction analytics: one row per structured extraction pulled from an asset by an
-# agent tool (written via ExtractionManager). The common envelope is typed columns; the
+# agent tool (written via AnalyticsManager — the BigQuery-backed analytics space, separate
+# from the Firestore operational stores). The common envelope is typed columns; the
 # variable per-doc-type payload rides in fields_json, so new extraction tool types need
 # no schema change — query them with JSON_VALUE(fields_json, '$.field').
 resource "google_bigquery_table" "extractions" {

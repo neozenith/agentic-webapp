@@ -42,3 +42,20 @@ def build_database_from_env() -> DatabaseManager:
         return BigQueryDatabaseManager(project=project, dataset=dataset)
     log.warning("No durable DB configured (DATABASE_BACKEND/FIRESTORE_DATABASE/BIGQUERY_DATASET) — using in-memory")
     return InMemoryDatabaseManager()
+
+
+def build_analytics_database_from_env() -> DatabaseManager:
+    """Construct the ANALYTICS backend — BigQuery in the cloud, in-memory locally.
+
+    Deliberately distinct from build_database_from_env (the operational store, which is
+    Firestore in the deployed envs): analytics is its own warehouse axis. BigQuery is used
+    when a project + dataset are configured; otherwise in-memory (local/dev). It never falls
+    back to Firestore.
+    """
+    project = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    dataset = os.environ.get("ANALYTICS_BIGQUERY_DATASET") or os.environ.get("BIGQUERY_DATASET")
+    if project and dataset:  # pragma: no cover — real BQ client; covered by live deploy
+        log.info("analytics -> BigQuery %s.%s", project, dataset)
+        return BigQueryDatabaseManager(project=project, dataset=dataset)
+    log.info("analytics -> in-memory (no BIGQUERY_DATASET configured)")
+    return InMemoryDatabaseManager()

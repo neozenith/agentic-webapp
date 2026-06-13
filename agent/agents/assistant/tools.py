@@ -27,7 +27,7 @@ from uuid import uuid4
 
 from google.adk.tools.tool_context import ToolContext
 
-from agentic_core.database import ExtractionManager, build_database_from_env
+from agentic_core.database import AnalyticsManager, build_analytics_database_from_env
 from agentic_core.models import ExtractionRecord
 
 from . import assets_client
@@ -36,7 +36,9 @@ from .attachments import note_tool_attachment
 log = logging.getLogger(__name__)
 
 _MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash-lite")
-_ANALYTICS = ExtractionManager(build_database_from_env())
+# Analytics is its own backend (BigQuery in cloud, in-memory locally) — separate from the
+# operational Firestore stores (sessions, assets). See AnalyticsManager.
+_ANALYTICS = AnalyticsManager(build_analytics_database_from_env())
 
 
 # --- list_assets ------------------------------------------------------------------------
@@ -114,6 +116,6 @@ async def record_extraction(asset_id: str, doc_type: str, fields_json: str, tool
         model_id=_MODEL,
         created_at=datetime.now(timezone.utc),
     )
-    await _ANALYTICS.record(record)
+    await _ANALYTICS.record_extraction(record)
     log.info("analytics recorded: %s doc_type=%s fields=%d", record.extraction_id, doc_type, len(fields))
     return {"status": "recorded", "extraction_id": record.extraction_id, "doc_type": doc_type, "fields": fields}

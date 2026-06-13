@@ -18,18 +18,19 @@ The agent (`agents/assistant/`) has three tools (`tools.py`):
 |---|---|
 | `list_assets()` | Lists stored assets (id, filename, type, size, date) so the model can pick one. |
 | `attach_asset(asset_id)` | Makes an asset's image/PDF visible to the model **this turn** by injecting it inline. Bytes are re-fetched from the backend (GCS) per turn and **never** saved to ADK's artifact store — see [ADR-0006](../docs/adr/adr-0006-assets-single-source-of-truth.md). |
-| `record_extraction(asset_id, doc_type, fields_json)` | Persists extracted details to the analytics store via `agentic-core` `ExtractionManager`. |
+| `record_extraction(asset_id, doc_type, fields_json)` | Persists extracted details to the analytics store via `agentic-core` `AnalyticsManager`. |
 
 **Asset access** is over HTTP to the backend (the single source of truth for assets), at
 `BACKEND_BASE_URL` (`http://localhost:8080` locally / Cloud Run; `http://backend:8080`
-under docker compose). The agent has no GCS credentials by design.
+under docker compose). The agent has no GCS credentials by design. Per-turn image injection
+(reliable image+text, no cross-turn leakage) lives in `attachments.py`'s before_model_callback.
 
-**Extending the extraction tool category.** The `ExtractionRecord` model is a common
-envelope: `doc_type` + a free-form `fields` payload (stored as one `fields_json` column).
-A new extraction tool (invoice, business card, …) is a new `doc_type` + `fields` shape —
-**no new table or schema**. Each such tool persists through the same backend-agnostic
-`ExtractionManager` (in-memory locally, Firestore/BigQuery when configured via
-`build_database_from_env()`), so there's always a local equivalent of the analytics store.
+**The analytics space (AnalyticsManager).** Analytics is a SEPARATE backend axis from the
+operational Firestore stores (sessions, assets): `AnalyticsManager` uses **BigQuery in the
+cloud and in-memory locally** (`build_analytics_database_from_env()`, selecting BigQuery when
+`BIGQUERY_DATASET` is set). The `ExtractionRecord` model is a common envelope — `doc_type` +
+a free-form `fields` payload (one `fields_json` column) — so a new extraction type (invoice,
+business card, odometer…) is a new `doc_type` + `fields` shape, **no new table or schema**.
 
 ## Run locally
 
