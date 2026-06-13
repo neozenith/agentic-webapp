@@ -139,14 +139,17 @@ export const BRANDS: readonly Brand[] = _brandsByDiscovery;
 
 export const DEFAULT_BRAND_ID = BRANDS[0]?.id ?? "default-v2ai";
 
-export const findBrand = (id: string): Brand | undefined => BRANDS.find((b) => b.id === id);
+export const findBrand = (id: string, brands: readonly Brand[] = BRANDS): Brand | undefined =>
+  brands.find((b) => b.id === id);
 
-export const getBrandOrDefault = (id: string | null | undefined): Brand => {
+// `brands` defaults to the glob-discovered registry; tests inject a synthetic
+// list to prove brand-switching without shipping throwaway brandpack dirs.
+export const getBrandOrDefault = (id: string | null | undefined, brands: readonly Brand[] = BRANDS): Brand => {
   if (id) {
-    const found = findBrand(id);
+    const found = findBrand(id, brands);
     if (found) return found;
   }
-  const fallback = BRANDS[0];
+  const fallback = brands[0];
   if (!fallback) throw new Error("Brand registry is empty");
   return fallback;
 };

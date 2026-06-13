@@ -18,21 +18,25 @@ export function Header() {
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-end gap-3 border-b border-border px-6">
-      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        brand
-        <select
-          aria-label="Switch brand"
-          className="rounded-md border border-input bg-transparent px-2 py-1 text-xs text-foreground"
-          value={brand.id}
-          onChange={(e) => setBrandId(e.target.value)}
-        >
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {/* The brand picker only earns its place when there's more than one brand
+          to switch between; with a single brand it would be a dead control. */}
+      {brands.length > 1 && (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          brand
+          <select
+            aria-label="Switch brand"
+            className="rounded-md border border-input bg-transparent px-2 py-1 text-xs text-foreground"
+            value={brand.id}
+            onChange={(e) => setBrandId(e.target.value)}
+          >
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <button
         type="button"
         aria-label="Toggle dark mode"

@@ -14,16 +14,25 @@ interface BrandContextValue {
 
 const BrandContext = createContext<BrandContextValue | null>(null);
 
-const readInitialBrandId = (): string => {
-  if (typeof window === "undefined") return DEFAULT_BRAND_ID;
-  return window.localStorage.getItem(STORAGE_KEY) ?? DEFAULT_BRAND_ID;
+const readInitialBrandId = (defaultId: string): string => {
+  if (typeof window === "undefined") return defaultId;
+  return window.localStorage.getItem(STORAGE_KEY) ?? defaultId;
 };
 
-export const BrandProvider = ({ children }: { children: React.ReactNode }) => {
+// `brands` defaults to the glob-discovered registry (production behavior is
+// unchanged); tests pass a synthetic list to exercise multi-brand switching.
+export const BrandProvider = ({
+  children,
+  brands = BRANDS,
+}: {
+  children: React.ReactNode;
+  brands?: readonly Brand[];
+}) => {
   const { theme } = useTheme();
-  const [brandId, setBrandIdState] = useState<string>(readInitialBrandId);
+  const defaultId = brands[0]?.id ?? DEFAULT_BRAND_ID;
+  const [brandId, setBrandIdState] = useState<string>(() => readInitialBrandId(defaultId));
 
-  const brand = useMemo(() => getBrandOrDefault(brandId), [brandId]);
+  const brand = useMemo(() => getBrandOrDefault(brandId, brands), [brandId, brands]);
 
   useEffect(() => {
     // Pick the light or dark semantic layer for the active theme, resolve the
@@ -42,7 +51,7 @@ export const BrandProvider = ({ children }: { children: React.ReactNode }) => {
     window.localStorage.setItem(STORAGE_KEY, id);
   }, []);
 
-  const value = useMemo<BrandContextValue>(() => ({ brand, brands: BRANDS, setBrandId }), [brand, setBrandId]);
+  const value = useMemo<BrandContextValue>(() => ({ brand, brands, setBrandId }), [brand, brands, setBrandId]);
 
   return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
 };
