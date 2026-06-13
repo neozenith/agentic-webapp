@@ -11,6 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 
+import { useAuth } from "@/components/auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,16 +19,18 @@ interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  area: string;
 }
 
-// `end` on Home so "/" isn't marked active for every nested route.
+// `end` on Home so "/" isn't marked active for every nested route. `area` gates the item
+// against the active user's RBAC permissions.
 const NAV: NavItem[] = [
-  { to: "/", label: "Home", icon: House },
-  { to: "/chat", label: "Chat", icon: MessagesSquare },
-  { to: "/sessions", label: "Sessions", icon: History },
-  { to: "/assets", label: "Assets", icon: FolderTree },
-  { to: "/analytics", label: "Analytics", icon: LineChart },
-  { to: "/admin", label: "Admin", icon: BarChart3 },
+  { to: "/", label: "Home", icon: House, area: "home" },
+  { to: "/chat", label: "Chat", icon: MessagesSquare, area: "chat" },
+  { to: "/sessions", label: "Sessions", icon: History, area: "sessions" },
+  { to: "/assets", label: "Assets", icon: FolderTree, area: "assets" },
+  { to: "/analytics", label: "Analytics", icon: LineChart, area: "analytics" },
+  { to: "/admin", label: "Admin", icon: BarChart3, area: "admin" },
 ];
 
 const STORAGE_KEY = "sidebar-collapsed";
@@ -53,6 +56,7 @@ function useCollapsed(): [boolean, () => void] {
 
 export function Sidebar() {
   const [collapsed, toggle] = useCollapsed();
+  const { can, loading } = useAuth();
   return (
     <aside
       data-collapsed={collapsed}
@@ -81,7 +85,8 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {/* Only show areas the active user's roles permit (RBAC); none until loaded. */}
+        {NAV.filter(({ area }) => loading || can(area)).map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

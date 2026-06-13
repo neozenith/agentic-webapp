@@ -24,20 +24,20 @@ def _record(rid: str, user: str, tokens: int) -> LlmUsageRecord:
     )
 
 
-def test_usage_summary_and_records(client, run):
+def test_usage_summary_and_records(admin_client, run):
     manager = LlmUsageManager(InMemoryDatabaseManager(), table="llm_usage")
     run(manager.record(_record("r1", "alice@example.com", 100)))
     run(manager.record(_record("r2", "bob@example.com", 200)))
-    client.app.dependency_overrides[deps.get_llm_usage_manager] = lambda: manager
+    admin_client.app.dependency_overrides[deps.get_llm_usage_manager] = lambda: manager
 
-    summary = client.get("/api/admin/usage")
+    summary = admin_client.get("/api/admin/usage")
     assert summary.status_code == 200
     body = summary.json()
     assert body["totals"]["calls"] == 2
     assert body["by_model"]["gemini-2.5-flash-lite"]["calls"] == 2
     assert body["by_user"]["alice@example.com"]["total_tokens"] == 150
 
-    records = client.get("/api/admin/usage/records?limit=10")
+    records = admin_client.get("/api/admin/usage/records?limit=10")
     assert records.status_code == 200
     assert {r["request_id"] for r in records.json()} == {"r1", "r2"}
 
@@ -46,23 +46,23 @@ def _record_in(rid: str, user: str, session: str, tokens: int) -> LlmUsageRecord
     return _record(rid, user, tokens).model_copy(update={"session_id": session})
 
 
-def test_users_rollup_and_user_sessions_drilldown(client, run):
+def test_users_rollup_and_user_sessions_drilldown(admin_client, run):
     manager = LlmUsageManager(InMemoryDatabaseManager(), table="llm_usage")
     # alice: two sessions; bob: one.
     run(manager.record(_record_in("r1", "alice@example.com", "s1", 100)))
     run(manager.record(_record_in("r2", "alice@example.com", "s1", 100)))
     run(manager.record(_record_in("r3", "alice@example.com", "s2", 100)))
     run(manager.record(_record_in("r4", "bob@example.com", "s9", 100)))
-    client.app.dependency_overrides[deps.get_llm_usage_manager] = lambda: manager
+    admin_client.app.dependency_overrides[deps.get_llm_usage_manager] = lambda: manager
 
-    users = client.get("/api/admin/users")
+    users = admin_client.get("/api/admin/users")
     assert users.status_code == 200
     by_user = {u["user_id"]: u for u in users.json()}
     assert by_user["alice@example.com"]["sessions"] == 2
     assert by_user["alice@example.com"]["calls"] == 3
     assert by_user["bob@example.com"]["sessions"] == 1
 
-    sessions = client.get("/api/admin/users/alice@example.com/sessions")
+    sessions = admin_client.get("/api/admin/users/alice@example.com/sessions")
     assert sessions.status_code == 200
     by_session = {s["session_id"]: s for s in sessions.json()}
     assert set(by_session) == {"s1", "s2"}

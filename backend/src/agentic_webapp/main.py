@@ -8,29 +8,16 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import rbac
+from .api.auth import iap_email, require_area
 from .api.routes import admin, agent, analytics, assets, health
 from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
-
-IAP_USER_HEADER = "x-goog-authenticated-user-email"
-
-
-def _iap_user(request: Request) -> str | None:
-    """The caller's identity from IAP. In prod IAP sets (and sanitizes) the header;
-    in non-prod a client may set it to simulate users when trust_forwarded_user is on
-    (ADR-0004). Disable trust to ignore client-supplied identity."""
-    if not get_settings().trust_forwarded_user:
-        return None
-    raw = request.headers.get(IAP_USER_HEADER)
-    if not raw:
-        return None
-    return raw.split(":", 1)[-1]  # strip "accounts.google.com:" prefix
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -51,8 +38,9 @@ def create_app() -> FastAPI:
     # Backend APIs.
     app.include_router(health.router)
     app.include_router(assets.router)
-    app.include_router(admin.router)
-    app.include_router(analytics.router)
+    # Sensitive areas are enforced server-side (defense-in-depth behind the SPA gating).
+    app.include_router(admin.router, dependencies=[Depends(require_area("admin"))])
+    app.include_router(analytics.router, dependencies=[Depends(require_area("analytics"))])
     # Scoped proxy to the agent sidecar (ADK run endpoints + /dev-ui), registered
     # before the SPA so those paths reach the agent, not the SPA fallback.
     app.include_router(agent.build_router())
@@ -63,12 +51,20 @@ def create_app() -> FastAPI:
 
         `user_id` is the pseudonymous, server-authoritative id the SPA uses for session
         ownership and bookkeeping; the raw email is never used as a key downstream."""
-        email = _iap_user(request)
+        email = iap_email(request)
+        roles = rbac.roles_for(email, environment=settings.environment, user_roles=settings.rbac_user_roles)
         return {
             "email": email,
             "user_id": mask_user_id(email) if email else None,
             "environment": settings.environment,
+            "roles": roles,
+            "permissions": rbac.permissions_for(roles),
         }
+
+    @app.get("/api/auth/personas")
+    async def personas() -> list[dict[str, Any]]:
+        """Switchable test identities (non-prod only) so RBAC mappings can be exercised."""
+        return rbac.personas(settings.environment)
 
     _mount_frontend(app, settings)
     return app

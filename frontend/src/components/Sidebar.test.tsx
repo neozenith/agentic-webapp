@@ -3,13 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { AuthProvider } from "./auth";
 import { Sidebar } from "./Sidebar";
 
 const renderSidebar = (path = "/") =>
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Sidebar />
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Sidebar />
+      </MemoryRouter>
+    </AuthProvider>,
   );
 
 afterEach(() => localStorage.clear());

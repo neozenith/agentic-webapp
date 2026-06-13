@@ -22,18 +22,18 @@ def _extraction(eid: str, doc_type: str, **fields: object) -> ExtractionRecord:
     )
 
 
-def test_extractions_list_and_semantic_summary(client, run):
+def test_extractions_list_and_semantic_summary(admin_client, run):
     manager = AnalyticsManager(InMemoryDatabaseManager())
     run(manager.record_extraction(_extraction("e1", "fuel_receipt", vendor="Shell", total="82.50")))
     run(manager.record_extraction(_extraction("e2", "fuel_receipt", vendor="BP", litres="45.2")))
     run(manager.record_extraction(_extraction("e3", "odometer", reading="123456")))
-    client.app.dependency_overrides[deps.get_analytics_manager] = lambda: manager
+    admin_client.app.dependency_overrides[deps.get_analytics_manager] = lambda: manager
 
-    rows = client.get("/api/analytics/extractions")
+    rows = admin_client.get("/api/analytics/extractions")
     assert rows.status_code == 200
     assert {r["extraction_id"] for r in rows.json()} == {"e1", "e2", "e3"}
 
-    summary = client.get("/api/analytics/summary")
+    summary = admin_client.get("/api/analytics/summary")
     assert summary.status_code == 200
     body = summary.json()
     assert body["total"] == 3

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { App } from "./App";
+import { AuthProvider, RequireArea } from "./components/auth";
 import { Admin } from "./pages/Admin";
 import { AdminSessionRaw } from "./pages/AdminSessionRaw";
 import { AdminUser } from "./pages/AdminUser";
@@ -18,19 +19,50 @@ if (!rootElement) throw new Error("Root element #root not found");
 createRoot(rootElement).render(
   <StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route element={<App />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/chat/:sessionId" element={<Chat />} />
-          <Route path="/sessions" element={<Sessions />} />
-          <Route path="/assets" element={<Assets />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/admin/users/:userId" element={<AdminUser />} />
-          <Route path="/admin/users/:userId/sessions/:sessionId" element={<AdminSessionRaw />} />
-        </Route>
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route element={<App />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/chat/:sessionId" element={<Chat />} />
+            <Route path="/sessions" element={<Sessions />} />
+            <Route path="/assets" element={<Assets />} />
+            {/* RBAC-gated areas (the backend enforces these too). */}
+            <Route
+              path="/analytics"
+              element={
+                <RequireArea area="analytics">
+                  <Analytics />
+                </RequireArea>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <RequireArea area="admin">
+                  <Admin />
+                </RequireArea>
+              }
+            />
+            <Route
+              path="/admin/users/:userId"
+              element={
+                <RequireArea area="admin">
+                  <AdminUser />
+                </RequireArea>
+              }
+            />
+            <Route
+              path="/admin/users/:userId/sessions/:sessionId"
+              element={
+                <RequireArea area="admin">
+                  <AdminSessionRaw />
+                </RequireArea>
+              }
+            />
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 );

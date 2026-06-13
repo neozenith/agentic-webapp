@@ -4,18 +4,21 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { App } from "./App";
+import { AuthProvider } from "./components/auth";
 import { Home } from "./pages/Home";
 import { server } from "./test/server";
 
 const renderApp = (path = "/chat") =>
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route element={<App />}>
-          <Route path="/chat" element={<div>chat-content</div>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<App />}>
+            <Route path="/chat" element={<div>chat-content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
   );
 
 describe("App shell", () => {

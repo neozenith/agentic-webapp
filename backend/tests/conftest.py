@@ -41,3 +41,11 @@ def client(asset_service):
     app = create_app()
     app.dependency_overrides[deps.get_asset_service] = lambda: asset_service
     return TestClient(app)
+
+
+@pytest.fixture
+def admin_client(client):
+    """A client carrying the admin test persona, so RBAC-gated areas (admin/analytics)
+    are reachable. Identity is the IAP header (ADR-0004), simulated here in tests."""
+    client.headers.update({"X-Goog-Authenticated-User-Email": "ada.admin@example.com"})
+    return client
