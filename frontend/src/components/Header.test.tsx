@@ -1,9 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { Brand } from "@/lib/brands";
+import { server } from "../test/server";
 import { AuthProvider } from "./auth";
 import { BrandProvider } from "./brand-provider";
 import { Header } from "./Header";
@@ -103,5 +105,38 @@ describe("Header theme + brand controls", () => {
     expect(document.documentElement.dataset.brand).toBe("globex");
     expect(document.documentElement.style.getPropertyValue("--primary").toLowerCase()).toBe("#445566");
     expect(localStorage.getItem("brand-id")).toBe("globex");
+  });
+
+  it("hides the brand picker when only one brand exists (no dead control)", () => {
+    renderHeader([FIXTURE_BRANDS[0] as Brand]);
+    expect(screen.queryByLabelText(/switch brand/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("Header mobile affordances", () => {
+  it("renders a hamburger toggle wired to the nav drawer", async () => {
+    renderHeader();
+    const hamburger = screen.getByRole("button", { name: /toggle navigation menu/i });
+    expect(hamburger).toHaveAttribute("aria-controls", "mobile-nav-drawer");
+    // Standalone (no NavDrawerProvider) the default no-op context keeps it closed even when clicked.
+    expect(hamburger).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(hamburger);
+    expect(hamburger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("gives the brand select a tap target above the WCAG 24px floor", () => {
+    renderHeader();
+    expect(screen.getByLabelText(/switch brand/i)).toHaveClass("min-h-9");
+  });
+
+  it("shows a persona switcher whose tap target clears the WCAG floor", async () => {
+    server.use(
+      http.get("/api/auth/personas", () =>
+        HttpResponse.json([{ email: "admin@example.com", name: "Admin", roles: ["admin"] }]),
+      ),
+    );
+    renderHeader();
+    const persona = await screen.findByLabelText(/switch test persona/i);
+    expect(persona).toHaveClass("min-h-9");
   });
 });

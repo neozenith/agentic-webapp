@@ -4,7 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AuthProvider } from "./auth";
-import { Sidebar } from "./Sidebar";
+import { NavDrawerProvider } from "./nav-drawer";
+import { MobileNavDrawer, Sidebar } from "./Sidebar";
 
 const renderSidebar = (path = "/") =>
   render(
@@ -41,5 +42,20 @@ describe("Sidebar", () => {
     renderSidebar();
     expect(screen.queryByText(/agentic-webapp/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /expand sidebar/i })).toBeInTheDocument();
+  });
+});
+
+describe("MobileNavDrawer", () => {
+  it("renders nothing while closed so it never adds to the page scroll width", () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter>
+          <NavDrawerProvider>
+            <MobileNavDrawer />
+          </NavDrawerProvider>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    expect(screen.queryByRole("complementary", { name: "Navigation" })).not.toBeInTheDocument();
   });
 });
