@@ -80,7 +80,7 @@ export function Admin() {
                         {u.name && <span className="font-medium">{u.name}</span>}
                         {u.email && <span className="text-xs text-muted-foreground">{u.email}</span>}
                         <Link
-                          className="font-mono text-xs text-muted-foreground hover:underline"
+                          className="inline-flex min-h-6 items-center font-mono text-xs text-muted-foreground hover:underline"
                           to={`/admin/users/${encodeURIComponent(u.user_id)}`}
                         >
                           {u.user_id}
@@ -88,7 +88,7 @@ export function Admin() {
                       </div>
                     ) : (
                       <Link
-                        className="text-secondary-foreground hover:underline"
+                        className="inline-flex min-h-6 items-center text-secondary-foreground hover:underline"
                         to={`/admin/users/${encodeURIComponent(u.user_id)}`}
                       >
                         {u.user_id}
