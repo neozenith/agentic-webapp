@@ -77,6 +77,22 @@ describe("Chat", () => {
     expect(await screen.findByText("pong")).toBeInTheDocument(); // agent reply
   });
 
+  it("keeps the composer focused after a message round-trip", async () => {
+    server.use(
+      me,
+      http.get("/apps/assistant/users/uid/sessions/s1", () => HttpResponse.json({ id: "s1", events: [] })),
+      http.post("/run", () => HttpResponse.json([{ content: { parts: [{ text: "pong" }] } }])),
+    );
+    const user = userEvent.setup();
+    renderChat("/chat/s1");
+    await screen.findByText(/Ask the agent something/i); // wait until loaded (input enabled)
+    const input = screen.getByPlaceholderText(/Type a message/i);
+    await user.type(input, "ping");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+    await screen.findByText("pong"); // reply landed → busy back to false
+    expect(input).toHaveFocus();
+  });
+
   it("surfaces an error when the agent call fails", async () => {
     server.use(
       me,

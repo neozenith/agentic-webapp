@@ -32,6 +32,24 @@ if (typeof globalThis.localStorage === "undefined") {
   globalThis.localStorage = new MemoryStorage();
 }
 
+// jsdom ships no matchMedia. ThemeProvider reads `prefers-color-scheme` for its initial
+// theme, so install a real (non-mock) implementation that reports "no preference"
+// (matches=false). Individual tests can replace window.matchMedia to drive the OS-pref
+// branch — that's environment control, not mocking app code.
+if (typeof globalThis.matchMedia === "undefined") {
+  globalThis.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
 // Start the MSW fake server once; reset handlers between tests; tear down at the end.
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());

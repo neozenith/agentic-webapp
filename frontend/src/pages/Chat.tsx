@@ -62,6 +62,10 @@ export function Chat() {
   const [attached, setAttached] = useState<Attached | null>(null);
   const [attaching, setAttaching] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // The message box is disabled mid-send (so a second message can't queue), which blurs it.
+  // We hold a ref so focus can be restored once the reply lands — otherwise the user has to
+  // click the box again before typing a follow-up.
+  const messageInput = useRef<HTMLInputElement>(null);
   // Guards against React StrictMode running the resolve effect twice (which would
   // otherwise create two server sessions for one /chat visit).
   const resolving = useRef(false);
@@ -104,6 +108,13 @@ export function Chat() {
     })();
   }, [userId, sessionId, navigate]);
 
+  // Restore focus to the composer once it's interactive again: after a reply lands `busy`
+  // returns to false and the input re-enables, but the browser doesn't refocus a previously
+  // disabled element on its own. Re-focus whenever the box is enabled and a session is ready.
+  useEffect(() => {
+    if (!busy && !loading && sessionId) messageInput.current?.focus();
+  }, [busy, loading, sessionId]);
+
   // Upload a photo straight to the asset store (POST /api/assets — the same endpoint the
   // Asset Manager uses, so it's immediately visible there too). We then reference it by id
   // in the message, rather than streaming raw bytes through the agent.
@@ -133,6 +144,9 @@ export function Chat() {
     setInput("");
     setAttached(null);
     setError(null);
+    // Keep the cursor in the box for the case where the send resolves before the disable/
+    // re-enable cycle would otherwise hand focus back (the effect covers the slower path).
+    messageInput.current?.focus();
     // Store the message WITH the asset reference so the image preview renders identically
     // live and on resume (the bytes stay in GCS — the reference is the single source of truth).
     setMessages((m) => [...m, { role: "user", text: outgoing }]);
@@ -256,6 +270,7 @@ export function Chat() {
           <Paperclip />
         </Button>
         <Input
+          ref={messageInput}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message…"

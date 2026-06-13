@@ -1,0 +1,20 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"id": "default-v2ai",
+	"name": "V2 AI",
+	"tagline": "Harness the power of AI in the Enterprise.",
+	"description": "APAC AI-native consultancy helping organisations move AI from isolated exploration to connected operational reality. Signature amber on black, Outfit sans, square-edge geometry.",
+	"version": "1.0.0",
+	"source": "https://www.v2.ai/",
+	"assets": {
+		"logo": "logo.svg",
+		"logoDark": "logo-dark.svg",
+		"icon": "icon.svg"
+	},
+	"tokens": {
+		"core": "tokens/core.tokens.json",
+		"light": "tokens/light.tokens.json",
+		"dark": "tokens/dark.tokens.json"
+	},
+	"swatches": ["#FEC40E", "#09090B", "#FFFFFF", "#71717A", "#FAFAFA"]
+}

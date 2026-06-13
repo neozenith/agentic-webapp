@@ -59,8 +59,15 @@ export async function fetchPersonas(): Promise<Persona[]> {
   return resp.json();
 }
 
+interface AdkFunctionCall {
+  name?: string;
+  args?: Record<string, unknown>;
+}
 interface AdkPart {
   text?: string;
+  // A tool the agent invoked this turn, and/or the result coming back from one.
+  functionCall?: AdkFunctionCall;
+  functionResponse?: { name?: string };
 }
 interface AdkEvent {
   author?: string;
@@ -115,6 +122,32 @@ export function sessionToMessages(session: AdkSession): ChatMessage[] {
     out.push({ role: event.author === "user" ? "user" : "assistant", text });
   }
   return out;
+}
+
+/** One conversation turn for the admin detail view: the prose plus any tool activity, so
+ * function-call turns (which have no user-visible text) are still represented. */
+export interface SessionTurn {
+  role: "user" | "agent";
+  text: string;
+  toolCalls: { name: string; args: Record<string, unknown> }[];
+  hasResponse: boolean;
+}
+
+/** Map a resumed session's ADK events to typed turns (mirrors sessionToMessages, but keeps
+ * tool calls / responses instead of discarding text-less events). */
+export function sessionToTurns(session: AdkSession): SessionTurn[] {
+  const turns: SessionTurn[] = [];
+  for (const event of session.events ?? []) {
+    const parts = event.content?.parts ?? [];
+    const text = parts.map((p) => p.text ?? "").join("");
+    const toolCalls = parts
+      .filter((p): p is AdkPart & { functionCall: AdkFunctionCall } => Boolean(p.functionCall))
+      .map((p) => ({ name: p.functionCall.name ?? "(unknown)", args: p.functionCall.args ?? {} }));
+    const hasResponse = parts.some((p) => Boolean(p.functionResponse));
+    if (!text && toolCalls.length === 0 && !hasResponse) continue; // skip truly empty events
+    turns.push({ role: event.author === "user" ? "user" : "agent", text, toolCalls, hasResponse });
+  }
+  return turns;
 }
 
 /** Send a message to the agent on an existing server-created session; return its reply. */

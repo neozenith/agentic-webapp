@@ -5,20 +5,28 @@ import { describe, expect, it } from "vitest";
 
 import { App } from "./App";
 import { AuthProvider } from "./components/auth";
+import { BrandProvider } from "./components/brand-provider";
+import { ThemeProvider } from "./components/theme-provider";
 import { Home } from "./pages/Home";
 import { server } from "./test/server";
 
+// The header (rendered inside App) consumes Theme + Brand context, so the shell is wrapped
+// exactly as in main.tsx (ThemeProvider outermost, then BrandProvider).
 const renderApp = (path = "/chat") =>
   render(
-    <AuthProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route element={<App />}>
-            <Route path="/chat" element={<div>chat-content</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
+    <ThemeProvider>
+      <BrandProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route element={<App />}>
+                <Route path="/chat" element={<div>chat-content</div>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </BrandProvider>
+    </ThemeProvider>,
   );
 
 describe("App shell", () => {
