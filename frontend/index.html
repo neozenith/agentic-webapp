@@ -1,9 +1,25 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>agentic-webapp</title>
+    <script>
+      // Pre-hydration theme: set the `.dark` class before first paint so there's no
+      // flash of the wrong theme. ThemeProvider reads the same source of truth and
+      // keeps this in sync afterwards. Mirrors readInitialTheme() in theme-provider.tsx.
+      (() => {
+        try {
+          const stored = localStorage.getItem("ui-theme");
+          const dark =
+            stored === "dark" ||
+            (stored !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch {
+          /* no storage / no matchMedia — fall back to the :root light baseline */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

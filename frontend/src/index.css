@@ -1,8 +1,10 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* Dark-first: <html class="dark"> is always set (see index.html). The palette below
-   is ported from the original hand-rolled theme — slate surfaces, teal accent. */
+/* Theme is provider-owned: ThemeProvider toggles `.dark` on <html> (a pre-hydration
+   script in index.html sets it before first paint to avoid a flash). `:root` is the
+   LIGHT baseline; `.dark` is the dark baseline. Both are passive fallbacks — at runtime
+   BrandProvider writes inline CSS vars on <html> that outrank these rule blocks. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -34,6 +36,28 @@
 
 :root {
   --radius: 0.75rem;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0d9488;
+  --primary-foreground: #f0fdfa;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #ccfbf1;
+  --accent-foreground: #134e4a;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #0d9488;
+}
+
+.dark {
   --background: #0b1120;
   --foreground: #e2e8f0;
   --card: #0f172a;
@@ -66,11 +90,15 @@
   }
   body {
     margin: 0;
+    background: var(--background);
+    @apply text-foreground;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  /* The dark theme keeps the original slate glow; light mode stays flat. */
+  .dark body {
     background:
       radial-gradient(1200px 600px at 50% -10%, #1e293b, transparent),
       var(--background);
-    @apply text-foreground;
-    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
   }
 }
 

@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { server } from "../test/server";
 import { AuthProvider, RequireArea } from "./auth";
+import { BrandProvider } from "./brand-provider";
 import { Sidebar } from "./Sidebar";
+import { ThemeProvider } from "./theme-provider";
 
 const me = (permissions: string[], extra: Record<string, unknown> = {}) =>
   http.get("/api/me", () =>
@@ -20,11 +22,17 @@ const me = (permissions: string[], extra: Record<string, unknown> = {}) =>
     }),
   );
 
+// Theme + Brand providers wrap the tree (as in main.tsx) so the Header — which consumes
+// both — renders here too; Sidebar/RequireArea ignore them.
 const renderWithAuth = (ui: React.ReactNode) =>
   render(
-    <AuthProvider>
-      <MemoryRouter>{ui}</MemoryRouter>
-    </AuthProvider>,
+    <ThemeProvider>
+      <BrandProvider>
+        <AuthProvider>
+          <MemoryRouter>{ui}</MemoryRouter>
+        </AuthProvider>
+      </BrandProvider>
+    </ThemeProvider>,
   );
 
 afterEach(() => localStorage.clear());

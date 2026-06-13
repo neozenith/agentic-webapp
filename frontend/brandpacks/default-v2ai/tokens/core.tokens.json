@@ -1,0 +1,54 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"$description": "Core (reference) tokens for V2 AI. Source: scraped from https://www.v2.ai/ (theme-color, computed styles, Outfit font-family). Yellow palette anchors on V2.AI's signature #FEC40E (yellow.400). Neutrals use Zinc to match V2.AI's --foreground HSL of 240 10% 3.9%. W3C DTCG format.",
+	"color": {
+		"$type": "color",
+		"yellow": {
+			"50": { "$value": "#FFFBEB" },
+			"100": { "$value": "#FEF3C7" },
+			"200": { "$value": "#FDE68A" },
+			"300": { "$value": "#FCD34D" },
+			"400": { "$value": "#FEC40E" },
+			"500": { "$value": "#E0A800" },
+			"600": { "$value": "#B58400" },
+			"700": { "$value": "#8A6300" },
+			"800": { "$value": "#5E4400" },
+			"900": { "$value": "#3D2C00" }
+		},
+		"zinc": {
+			"50": { "$value": "#FAFAFA" },
+			"100": { "$value": "#F4F4F5" },
+			"200": { "$value": "#E4E4E7" },
+			"300": { "$value": "#D4D4D8" },
+			"400": { "$value": "#A1A1AA" },
+			"500": { "$value": "#71717A" },
+			"600": { "$value": "#52525B" },
+			"700": { "$value": "#3F3F46" },
+			"800": { "$value": "#27272A" },
+			"900": { "$value": "#18181B" },
+			"950": { "$value": "#09090B" }
+		},
+		"rose": { "500": { "$value": "#F43F5E" } },
+		"white": { "$value": "#FFFFFF" },
+		"black": { "$value": "#000000" }
+	},
+	"radius": {
+		"$type": "dimension",
+		"base": { "$value": "0.5rem" }
+	},
+	"font": {
+		"sans": {
+			"$type": "fontFamily",
+			"$value": [
+				"Outfit",
+				"Outfit Fallback",
+				"ui-sans-serif",
+				"system-ui",
+				"-apple-system",
+				"Segoe UI",
+				"Roboto",
+				"sans-serif"
+			]
+		}
+	}
+}

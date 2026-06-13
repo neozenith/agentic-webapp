@@ -1,0 +1,26 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"$description": "Woolworths Group DARK mode. Deep navy background, white text, blue CTAs. Names match this app's shadcn/ui CSS variable set 1:1 (no sidebar-* / chart-*).",
+	"color": {
+		"$type": "color",
+		"background": { "$value": "{color.ink.navy}" },
+		"foreground": { "$value": "{color.white}" },
+		"card": { "$value": "{color.ink.medium}" },
+		"card-foreground": { "$value": "{color.white}" },
+		"popover": { "$value": "{color.ink.medium}" },
+		"popover-foreground": { "$value": "{color.white}" },
+		"primary": { "$value": "{color.ww-blue.400}" },
+		"primary-foreground": { "$value": "{color.ink.navy}" },
+		"secondary": { "$value": "{color.ink.medium}" },
+		"secondary-foreground": { "$value": "{color.white}" },
+		"muted": { "$value": "{color.ink.medium}" },
+		"muted-foreground": { "$value": "{color.ink.light}" },
+		"accent": { "$value": "{color.ww-blue.800}" },
+		"accent-foreground": { "$value": "{color.ww-blue.200}" },
+		"destructive": { "$value": "{color.rose.500}" },
+		"destructive-foreground": { "$value": "{color.white}" },
+		"border": { "$value": "{color.ink.medium}" },
+		"input": { "$value": "{color.ink.medium}" },
+		"ring": { "$value": "{color.ww-blue.400}" }
+	}
+}

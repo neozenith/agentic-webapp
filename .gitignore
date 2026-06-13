@@ -5,6 +5,10 @@ tmp/
 # Local agent config (own repo).
 .claude/
 
+# Python bytecode (top-level scripts/ has no subproject .gitignore to catch it).
+__pycache__/
+*.pyc
+
 # Coverage + test artifacts (pytest-cov, vitest v8, emulator logs).
 .coverage
 coverage/

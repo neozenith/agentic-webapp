@@ -1,0 +1,20 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"id": "retail-woolworths",
+	"name": "Woolworths Group",
+	"tagline": "Trusted brands in retailing.",
+	"description": "Australian retail group corporate identity. Bright corporate blue primary, near-black foreground, white surfaces, Montserrat sans.",
+	"version": "1.0.0",
+	"source": "https://www.woolworthsgroup.com.au/",
+	"assets": {
+		"logo": "logo.svg",
+		"logoDark": "logo-dark.svg",
+		"icon": "icon.svg"
+	},
+	"tokens": {
+		"core": "tokens/core.tokens.json",
+		"light": "tokens/light.tokens.json",
+		"dark": "tokens/dark.tokens.json"
+	},
+	"swatches": ["#1971ED", "#0E0D26", "#202020", "#288144", "#F2F2F2"]
+}
