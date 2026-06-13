@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api.routes import admin, agent, assets, health
+from .api.routes import admin, agent, analytics, assets, health
 from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
@@ -52,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(assets.router)
     app.include_router(admin.router)
+    app.include_router(analytics.router)
     # Scoped proxy to the agent sidecar (ADK run endpoints + /dev-ui), registered
     # before the SPA so those paths reach the agent, not the SPA fallback.
     app.include_router(agent.build_router())

@@ -1,4 +1,13 @@
-import { BarChart3, FolderTree, History, House, type LucideIcon, MessagesSquare, PanelLeft } from "lucide-react";
+import {
+  BarChart3,
+  FolderTree,
+  History,
+  House,
+  LineChart,
+  type LucideIcon,
+  MessagesSquare,
+  PanelLeft,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 
@@ -17,6 +26,7 @@ const NAV: NavItem[] = [
   { to: "/chat", label: "Chat", icon: MessagesSquare },
   { to: "/sessions", label: "Sessions", icon: History },
   { to: "/assets", label: "Assets", icon: FolderTree },
+  { to: "/analytics", label: "Analytics", icon: LineChart },
   { to: "/admin", label: "Admin", icon: BarChart3 },
 ];
 

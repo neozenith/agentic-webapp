@@ -12,6 +12,7 @@ from functools import lru_cache
 
 from ..config import get_settings
 from agentic_core.database import (
+    AnalyticsManager,
     AssetMetadataManager,
     BigQueryDatabaseManager,
     DatabaseManager,
@@ -63,6 +64,19 @@ def get_asset_metadata_manager() -> AssetMetadataManager:
 @lru_cache
 def get_llm_usage_manager() -> LlmUsageManager:
     return LlmUsageManager(get_database(), table=get_settings().llm_usage_table)
+
+
+@lru_cache
+def get_analytics_manager() -> AnalyticsManager:
+    """The analytics warehouse (AnalyticsManager) — BigQuery when a project+dataset are
+    configured, else in-memory. Deliberately separate from get_database() (the operational
+    Firestore store): analytics is its own backend axis (see AnalyticsManager)."""
+    s = get_settings()
+    if s.gcp_project and s.bigquery_dataset:
+        return AnalyticsManager(  # pragma: no cover — real BQ client; covered by live deploy
+            BigQueryDatabaseManager(project=s.gcp_project, dataset=s.bigquery_dataset)
+        )
+    return AnalyticsManager(InMemoryDatabaseManager())
 
 
 @lru_cache

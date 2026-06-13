@@ -161,3 +161,70 @@ export async function fetchUsageRecords(limit = 100): Promise<UsageRecord[]> {
   if (!resp.ok) throw new Error(`records error ${resp.status}`);
   return resp.json();
 }
+
+// --- Admin: per-user roll-up + per-session drilldown ---
+export interface UserSummary {
+  user_id: string;
+  sessions: number;
+  calls: number;
+  total_tokens: number;
+  est_cost_usd: number;
+}
+
+export interface SessionSummary {
+  session_id: string;
+  calls: number;
+  total_tokens: number;
+  est_cost_usd: number;
+  last_timestamp: string;
+}
+
+export async function fetchUsers(): Promise<UserSummary[]> {
+  const resp = await fetch("/api/admin/users");
+  if (!resp.ok) throw new Error(`users error ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchUserSessions(userId: string): Promise<SessionSummary[]> {
+  const resp = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/sessions`);
+  if (!resp.ok) throw new Error(`user sessions error ${resp.status}`);
+  return resp.json();
+}
+
+// --- Analytics: the AnalyticsManager warehouse (extractions + discovered schema) ---
+export interface Extraction {
+  extraction_id: string;
+  asset_id: string;
+  doc_type: string;
+  user_id: string;
+  session_id: string;
+  fields: Record<string, unknown>;
+  model_id: string | null;
+  created_at: string;
+}
+
+export interface AnalyticsSummary {
+  total: number;
+  by_doc_type: { doc_type: string; count: number; fields: string[] }[];
+}
+
+export async function fetchExtractions(limit = 200): Promise<Extraction[]> {
+  const resp = await fetch(`/api/analytics/extractions?limit=${limit}`);
+  if (!resp.ok) throw new Error(`extractions error ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
+  const resp = await fetch("/api/analytics/summary");
+  if (!resp.ok) throw new Error(`analytics error ${resp.status}`);
+  return resp.json();
+}
+
+/** Fetch a raw ADK session (events + state) for the admin raw-logs view. */
+export async function fetchRawSession(userId: string, sessionId: string): Promise<unknown> {
+  const resp = await fetch(
+    `/apps/assistant/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
+  );
+  if (!resp.ok) throw new Error(`session error ${resp.status}`);
+  return resp.json();
+}

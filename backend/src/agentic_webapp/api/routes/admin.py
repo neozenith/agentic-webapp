@@ -43,3 +43,59 @@ async def usage_summary(manager: UsageDep, limit: int = 1000) -> dict[str, Any]:
 async def usage_records(manager: UsageDep, limit: int = 100) -> list[LlmUsageRecord]:
     """Most-recent itemised usage records."""
     return await manager.list(limit=limit)
+
+
+@router.get("/users")
+async def users(manager: UsageDep, limit: int = 5000) -> list[dict[str, Any]]:
+    """Per-user roll-up: distinct sessions, calls, tokens, and cost — most expensive first."""
+    acc: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0, "sessions": set()}
+    )
+    for r in await manager.list(limit=limit):
+        b = acc[r.user_id]
+        b["calls"] += 1
+        b["total_tokens"] += r.total_tokens
+        b["est_cost_usd"] += r.est_cost_usd
+        b["sessions"].add(r.session_id)
+    rows = [
+        {
+            "user_id": user_id,
+            "sessions": len(b["sessions"]),
+            "calls": b["calls"],
+            "total_tokens": b["total_tokens"],
+            "est_cost_usd": round(b["est_cost_usd"], 6),
+        }
+        for user_id, b in acc.items()
+    ]
+    rows.sort(key=lambda x: x["est_cost_usd"], reverse=True)
+    return rows
+
+
+@router.get("/users/{user_id}/sessions")
+async def user_sessions(user_id: str, manager: UsageDep, limit: int = 5000) -> list[dict[str, Any]]:
+    """Per-session roll-up for one user (calls, tokens, cost, last activity), newest first."""
+    acc: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"calls": 0, "total_tokens": 0, "est_cost_usd": 0.0, "last_timestamp": ""}
+    )
+    for r in await manager.list(limit=limit):
+        if r.user_id != user_id:
+            continue
+        b = acc[r.session_id]
+        b["calls"] += 1
+        b["total_tokens"] += r.total_tokens
+        b["est_cost_usd"] += r.est_cost_usd
+        ts = r.timestamp.isoformat()
+        if ts > b["last_timestamp"]:
+            b["last_timestamp"] = ts
+    rows = [
+        {
+            "session_id": session_id,
+            "calls": b["calls"],
+            "total_tokens": b["total_tokens"],
+            "est_cost_usd": round(b["est_cost_usd"], 6),
+            "last_timestamp": b["last_timestamp"],
+        }
+        for session_id, b in acc.items()
+    ]
+    rows.sort(key=lambda x: x["last_timestamp"], reverse=True)
+    return rows
