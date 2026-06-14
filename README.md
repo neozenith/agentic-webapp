@@ -346,13 +346,20 @@ Because every interface rides the one RBAC engine, the same persona yields the s
 everywhere — a viewer is refused `admin_users` identically via the CLI, the MCP, `claude -p`, and
 `codex`.
 
+The **live chat agent** is itself an MCP client: its business-logic tools are the kernel's MCP
+(`assets_list` / `assets_get` / `extractions_record`), with the chat user's identity forwarded as
+`X-Viewer-User-Id` per request. So the web chat doubles as an MCP+auth test surface, and recording
+an extraction is now a kernel endpoint (`POST /api/extractions`) rather than sidecar logic. Only
+multimodal image injection (showing the model a receipt) stays an agent callback — the generic
+OpenAPI→MCP bridge can't carry image bytes ([ADR-0011](docs/adr/adr-0011-core-api-mcp-and-cli.md)).
+
 ## Project layout
 
 | Path | Role |
 |------|------|
 | [`frontend/`](frontend) | React + Vite SPA (Home / Chat / Admin), built into the backend image |
 | [`backend/`](backend) | FastAPI app: serves the SPA, proxies the agent, exposes `/api/*` + an MCP server at `/mcp`, owns GCS + Firestore/BigQuery |
-| [`agent/`](agent) | Google ADK agent sidecar; meters token usage via `after_model_callback`. `agent/harness/` drives the MCP from an ADK agent |
+| [`agent/`](agent) | Google ADK agent sidecar — its business-logic tools ARE the kernel's MCP (`mcp.py`), so the sidecar stays thin; meters token usage via `after_model_callback`. `agent/harness/` drives the MCP from a standalone ADK agent |
 | [`cli/`](cli) | Thin Python CLI that drives `/api/*` as a chosen persona (`--as`) — RBAC simulation from the terminal |
 | [`libs/core`](libs/core) | Shared models, storage / database interfaces, LLM pricing |
 | [`infra/`](infra) | Terraform stacks, bootstrap (WIF), and the `tfs` deploy CLI |

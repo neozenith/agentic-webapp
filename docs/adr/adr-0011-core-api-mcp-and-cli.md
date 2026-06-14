@@ -32,6 +32,22 @@ RBAC engine rather than re-implementing it:
 2. **A Python CLI** (`cli/`, stdlib argparse, httpx-only runtime) that drives `/api/*` and
    forwards a chosen persona via `--as <email>`. It enforces nothing locally; the server decides.
 
+3. **The live chat agent consumes the MCP** (`agent/agents/assistant/mcp.py`). Its business-logic
+   tools ARE the kernel's MCP (`assets_list` / `assets_get` / `extractions_record`, least-privilege
+   `tool_filter`); the bespoke `list_assets`/`record_extraction` tools and the agent-side analytics
+   manager are gone. Identity flows per request via a `header_provider` that forwards the ADK
+   session `user_id` as `X-Viewer-User-Id`, so the kernel scopes RBAC to the chat user. This made
+   the sidecar thin and forced the **`record_extraction` business logic into a new kernel endpoint**
+   (`POST /api/extractions`, visibility-gated → MCP tool `extractions_record`) — previously the
+   agent wrote analytics itself (to a *separate* in-memory store locally, a latent bug now fixed).
+   - **Exception — multimodal image injection stays an agent callback.** Showing the model a
+     receipt's pixels can't go through the OpenAPI→MCP bridge: FastMCP decodes tool results as
+     text and a binary content endpoint raises `'utf-8' codec can't decode` (verified). So
+     `attach_referenced_assets` (a `before_model_callback`) still fetches bytes from the kernel's
+     RBAC-checked content endpoint, and `attach_asset` remains a thin turn-scoped *rendering*
+     directive (not business logic). "Agent uses the MCP instead of tool calls" holds for every
+     model tool; image injection isn't a tool call.
+
 OpenAPI is given stable `{tag}_{verb}` operation ids (`assets_list`, `admin_users`, …) via a
 `generate_unique_id_function`, so MCP tool names and any generated clients are predictable. The
 agent reverse-proxy routes are marked `include_in_schema=False` (a passthrough, not API ops).
@@ -45,6 +61,11 @@ subscription LLMs and that RBAC holds there too.
 - **One RBAC implementation.** Requirements "simulate RBAC on the API" and "…on the MCP" are the
   same code path; the MCP added zero policy logic. Verified live: a viewer is denied `admin_users`
   over the CLI, the in-process MCP client, `claude -p`, and `codex` with the identical message.
+- **The web chat is now an MCP+auth test surface.** Verified at the transport layer: with the
+  chat user's `X-Viewer-User-Id`, the agent's MCP path lists only that user's assets and records
+  an extraction whose stored `user_id` equals the session id; a different user is denied (404) —
+  no Gemini needed to prove the kernel + identity. (The model's tool *selection* is exercised by
+  the e2e suite against deployed dev.)
 - **The MCP stays in sync with the API for free** — it's a projection of the OpenAPI spec
   (`mcp_server.py` is ~17 statements for 26 tools), so new `/api/*` routes become tools
   automatically.

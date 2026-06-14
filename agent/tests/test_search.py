@@ -32,13 +32,13 @@ def test_web_search_is_an_agent_tool_wrapping_the_search_agent():
     assert search.web_search.agent is search.search_agent
 
 
-def test_root_agent_exposes_web_search_alongside_the_function_tools():
-    # web_search is added WITHOUT displacing the existing three FunctionTools.
+def test_root_agent_exposes_web_search_alongside_the_mcp_and_attach_tools():
+    # web_search sits beside the kernel MCP toolset and the local attach_asset directive.
     assert search.web_search in root_agent.tools
     tool_names = [getattr(t, "name", type(t).__name__) for t in root_agent.tools]
     assert "search_agent" in tool_names  # AgentTool.name derives from the wrapped agent
-    # The original function tools are still present (one entry per registered tool).
-    assert len(root_agent.tools) == 4
+    # mcp (business logic) + attach_asset (multimodal directive) + web_search.
+    assert len(root_agent.tools) == 3
 
 
 def test_root_instruction_directs_the_model_to_search_for_fresh_info():

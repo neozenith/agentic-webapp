@@ -1,6 +1,7 @@
-"""Tests for the agent tools + turn-scoped attachment logic — real in-memory
-AnalyticsManager + pure helpers, no mocks. ADK context objects are plain SimpleNamespace
-stubs carrying the attributes the code reads (same approach as test_bookkeeping)."""
+"""Tests for the agent's local attachment logic — pure helpers, no mocks. ADK context
+objects are plain SimpleNamespace stubs carrying the attributes the code reads (same approach
+as test_bookkeeping). Asset listing + extraction recording are the kernel's MCP tools now, so
+they're tested in the backend (tests/test_extractions.py), not here."""
 
 from __future__ import annotations
 
@@ -8,17 +9,16 @@ import asyncio
 from types import SimpleNamespace
 
 from assistant import attachments, tools
-from assistant.assets_client import _summarise, preview_url
-
-
-def test_summarise_includes_a_servable_preview_url():
-    out = _summarise({"asset_id": "a1", "filename": "r.png", "content_type": "image/png", "size_bytes": 9})
-    assert out["asset_id"] == "a1"
-    assert out["preview_url"] == "/api/assets/a1/content"
+from assistant.assets_client import _viewer_headers, preview_url
 
 
 def test_preview_url():
     assert preview_url("xyz") == "/api/assets/xyz/content"
+
+
+def test_viewer_headers_only_when_identified():
+    assert _viewer_headers("u1") == {"X-Viewer-User-Id": "u1"}
+    assert _viewer_headers(None) == {}
 
 
 def test_is_injectable():
@@ -77,33 +77,3 @@ def test_attach_asset_records_and_returns_preview_url():
 def test_attach_asset_requires_an_id():
     out = asyncio.run(tools.attach_asset("", _tool_ctx()))
     assert out["status"] == "error"
-
-
-def test_parse_fields_handles_object_scalar_and_garbage():
-    assert tools._parse_fields('{"vendor":"Shell","total":"82.50"}') == {"vendor": "Shell", "total": "82.50"}
-    assert tools._parse_fields("") == {}
-    assert tools._parse_fields("[1,2]") == {"value": [1, 2]}
-    assert tools._parse_fields("not json") == {"raw": "not json"}
-
-
-def _extract_ctx(user: str = "alice", sid: str = "s1") -> SimpleNamespace:
-    session = SimpleNamespace(app_name="assistant", user_id=user, id=sid)
-    return SimpleNamespace(_invocation_context=SimpleNamespace(session=session))
-
-
-def test_record_extraction_writes_a_row():
-    before = len(asyncio.run(tools._ANALYTICS.list_extractions()))
-    out = asyncio.run(
-        tools.record_extraction(
-            asset_id="a1",
-            doc_type="fuel_receipt",
-            fields_json='{"vendor":"Shell","total":"82.50","currency":"AUD"}',
-            tool_context=_extract_ctx(user="alice"),
-        )
-    )
-    assert out["status"] == "recorded"
-    rows = asyncio.run(tools._ANALYTICS.list_extractions())
-    assert len(rows) == before + 1
-    latest = rows[0]
-    assert latest.user_id == "alice"
-    assert latest.fields["vendor"] == "Shell"

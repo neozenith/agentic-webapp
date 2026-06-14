@@ -18,7 +18,7 @@ from fastapi.utils import generate_unique_id as _default_unique_id
 from . import rbac
 from .api.auth import iap_email, require_area
 from .api.deps import get_group_manager
-from .api.routes import admin, agent, analytics, assets, folders, health
+from .api.routes import admin, agent, analytics, assets, extractions, folders, health
 from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
@@ -68,6 +68,9 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(assets.router)
     app.include_router(folders.router)
+    # Extraction WRITE — visibility-gated (not area-gated): the agent records on a user's
+    # behalf for any asset that user can see. Read stays admin/analytics-gated (analytics.router).
+    app.include_router(extractions.router)
     # Sensitive areas are enforced server-side (defense-in-depth behind the SPA gating).
     app.include_router(admin.router, dependencies=[Depends(require_area("admin"))])
     app.include_router(analytics.router, dependencies=[Depends(require_area("analytics"))])

@@ -62,9 +62,15 @@ def _call(url: str, email: str | None, tool: str, args: dict[str, Any]) -> Any:
 def test_mcp_exposes_only_core_api_tools(mcp_url: str) -> None:
     tools = _list_tools(mcp_url, ADMIN)
     # The whole /api/* surface is present as predictably-named tools…
-    assert {"assets_list", "assets_share", "folders_list", "admin_users", "analytics_summary", "identity_me"} <= set(
-        tools
-    )
+    assert {
+        "assets_list",
+        "assets_share",
+        "folders_list",
+        "admin_users",
+        "analytics_summary",
+        "identity_me",
+        "extractions_record",  # the kernel write endpoint, surfaced as a tool
+    } <= set(tools)
     # …binary byte-stream endpoints are NOT tools, and neither are SPA/agent-proxy paths.
     assert not any("content" in name for name in tools)
     assert all(not name.startswith(("agent_", "spa", "health")) for name in tools)
