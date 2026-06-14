@@ -10,6 +10,7 @@ on:
       - "frontend/**"
       - "libs/**"
       - "agent/**"
+      - "cli/**"
       - "infra/**"
       - "scripts/**"
       - "Makefile"
@@ -33,6 +34,8 @@ jobs:
           - { dir: libs/core, emulator: true }
           - { dir: backend, emulator: false }
           - { dir: agent, emulator: true }
+          # cli boots the real backend in-process with in-memory backends — no emulator.
+          - { dir: cli, emulator: false }
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
