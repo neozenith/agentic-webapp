@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     # Run (single service) it's localhost; in docker-compose it's the service name.
     agent_base_url: str = "http://localhost:8081"
 
+    # Loopback URL the mounted MCP server uses to call the core API as an ordinary
+    # external client (so it traverses the same middleware + RBAC). None → derived
+    # from `port` as http://127.0.0.1:<port>; in Cloud Run that's this same process.
+    self_base_url: str | None = None
+
     # Built React SPA dir (copied into the image at /app/frontend_dist). Absent on a
     # local backend-only run → SPA disabled, a status page is served at /.
     frontend_dist: Path = Path("frontend_dist")
