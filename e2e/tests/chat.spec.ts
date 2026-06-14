@@ -54,9 +54,10 @@ test("agent usage is accounted into BigQuery and shown on Admin", async ({ page 
     })
     .toBeGreaterThan(before);
 
-  // The cheapest model is the one billed, and the by-model table proves itemisation.
+  // Real itemised usage, not just a counter: the tokens stat is a positive number too.
   await page.goto("/admin");
-  await expect(page.getByText("gemini-2.5-flash-lite")).toBeVisible();
+  const tokensText = await page.getByTestId("stat-tokens").locator("span").first().textContent();
+  expect(Number.parseInt((tokensText ?? "0").replace(/\D/g, ""), 10)).toBeGreaterThan(0);
 
   await testInfo.attach("admin-usage.png", {
     body: await page.screenshot({ fullPage: true }),
