@@ -8,7 +8,7 @@ SHELL       := /usr/bin/env bash
 IMAGE ?= agentic-webapp-backend:local
 PORT  ?= 8080
 
-.PHONY: help install dev dev-cloud start test typecheck lint fix ci docker-build docker-run
+.PHONY: help install dev dev-cloud start openapi test typecheck lint fix ci docker-build docker-run
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -31,6 +31,10 @@ dev-cloud: ## Run locally AGAINST cloud services (GCS+Firestore in the dev proje
 
 start: ## Run locally without reload (production entrypoint)
 	uv run uvicorn agentic_webapp.main:app --host 0.0.0.0 --port $(PORT)
+
+openapi: ## Dump the OpenAPI spec to openapi.json (the contract CLIs/clients integrate against)
+	uv run python -c "import json; from agentic_webapp.main import create_app; print(json.dumps(create_app().openapi(), indent=2))" > openapi.json
+	@echo ">>> wrote backend/openapi.json"
 
 test: ## Run the test suite (real impls, no mocks)
 	uv run pytest -q

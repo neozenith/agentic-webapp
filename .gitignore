@@ -9,6 +9,10 @@ tmp/
 __pycache__/
 *.pyc
 
+# Generated OpenAPI contract dump (regenerate with `make -C backend openapi`; the live
+# /openapi.json endpoint is the always-fresh source of truth).
+backend/openapi.json
+
 # Coverage + test artifacts (pytest-cov, vitest v8, emulator logs).
 .coverage
 coverage/

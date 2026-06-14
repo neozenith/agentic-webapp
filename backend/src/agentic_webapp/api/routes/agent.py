@@ -66,8 +66,11 @@ def build_router() -> APIRouter:
     async def wild(request: Request, path: str) -> StreamingResponse:  # noqa: ARG001 — path satisfies the route
         return await proxy_to_agent(request, request.url.path.lstrip("/"))
 
+    # A reverse-proxy passthrough, not documented API operations: keep it out of the OpenAPI
+    # schema (one handler bound to many paths would otherwise emit duplicate operation ids,
+    # and it must never surface as an MCP tool).
     for p in _FIXED:
-        router.add_api_route(p, fixed, methods=_METHODS)
+        router.add_api_route(p, fixed, methods=_METHODS, include_in_schema=False)
     for p in _WILD:
-        router.add_api_route(p, wild, methods=_METHODS)
+        router.add_api_route(p, wild, methods=_METHODS, include_in_schema=False)
     return router

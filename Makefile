@@ -4,13 +4,25 @@ SHELL         := /usr/bin/env bash
 .SHELLFLAGS   := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 
-# Order: libs/core first (backend + agent depend on it), then the apps, then infra.
-SUBPROJECTS := libs/core backend agent frontend infra
+# Order: libs/core first (backend + agent depend on it), then the apps, the CLI, then infra.
+SUBPROJECTS := libs/core backend agent cli frontend infra
 
-.PHONY: help install dev dev-docker clean-ports fix ci $(addprefix ci-,$(SUBPROJECTS)) $(addprefix fix-,$(SUBPROJECTS))
+.PHONY: help install dev dev-docker clean-ports fix ci openapi mcp-cli mcp-agent mcp-claude mcp-codex $(addprefix ci-,$(SUBPROJECTS)) $(addprefix fix-,$(SUBPROJECTS))
 
 # Local dev ports — agent sidecar, FastAPI backend, Vite SPA.
 DEV_PORTS := 8081 8080 5173
+
+# --- Local MCP testing harness (manual; run `make -C backend dev` in another shell first) ---
+# Pick a persona by alias (ada/nina/otto/vera) or pass a full email: `make mcp-cli PERSONA=vera`.
+PERSONA       ?= ada
+EMAIL_ada     := ada.admin@example.com
+EMAIL_nina    := nina.analyst@example.com
+EMAIL_otto    := otto.operator@example.com
+EMAIL_vera    := vera.viewer@example.com
+PERSONA_EMAIL := $(or $(EMAIL_$(PERSONA)),$(PERSONA))
+MCP_PROMPT    ?= List your MCP tools, call identity_me for my roles, then try admin_users. Be terse.
+GCP_PROJECT   ?= dbt-dev-jaffleshop
+GCP_REGION    ?= australia-southeast1
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_/-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -47,3 +59,21 @@ ci-%: ## Run ci for one subproject (e.g. make ci-backend)
 
 fix-%: ## Run fix for one subproject (e.g. make fix-frontend)
 	$(MAKE) -C $* fix
+
+openapi: ## Dump the backend OpenAPI spec (the contract CLIs/clients integrate against)
+	$(MAKE) -C backend openapi
+
+mcp-cli: ## Drive the core API via the local CLI as PERSONA (e.g. make mcp-cli PERSONA=vera)
+	uv run --directory cli -m agentic_cli me --as $(PERSONA_EMAIL)
+	@echo ">>> admin users as $(PERSONA_EMAIL) (RBAC 403s a non-admin — that's the point):"
+	-uv run --directory cli -m agentic_cli admin users --as $(PERSONA_EMAIL)
+
+mcp-agent: ## Drive the MCP via the ADK test agent as PERSONA (needs Vertex/ADC)
+	GOOGLE_GENAI_USE_VERTEXAI=True GOOGLE_CLOUD_PROJECT=$(GCP_PROJECT) GOOGLE_CLOUD_LOCATION=$(GCP_REGION) \
+	  uv run --directory agent python -m harness.mcp_agent --as $(PERSONA_EMAIL) "$(MCP_PROMPT)"
+
+mcp-claude: ## Print the `claude -p` MCP command as PERSONA (add RUN=1 to execute it)
+	uv run scripts/mcp_harness.py claude --as $(PERSONA_EMAIL) --prompt "$(MCP_PROMPT)" $(if $(RUN),--run,)
+
+mcp-codex: ## Print the `codex exec` MCP command as PERSONA (add RUN=1 to execute it)
+	uv run scripts/mcp_harness.py codex --as $(PERSONA_EMAIL) --prompt "$(MCP_PROMPT)" $(if $(RUN),--run,)

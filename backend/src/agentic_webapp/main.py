@@ -11,7 +11,9 @@ from typing import Annotated, Any
 from agentic_core.database import GroupManager
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
+from fastapi.utils import generate_unique_id as _default_unique_id
 
 from . import rbac
 from .api.auth import iap_email, require_area
@@ -20,13 +22,36 @@ from .api.routes import admin, agent, analytics, assets, folders, health
 from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
+from .mcp_server import build_mcp
+
+
+def _operation_id(route: APIRoute) -> str:
+    """Stable, predictable operation ids for the /api/* surface (e.g. `assets_list`,
+    `assets_share`, `admin_users`) so MCP tool names and generated clients are clean. The
+    tag supplies the noun, so a redundant tag/singular token is stripped from the handler
+    name. Non-API routes (agent proxy, health, SPA) keep FastAPI's collision-safe default —
+    the proxy reuses one handler across many paths, which would otherwise collide."""
+    if not route.path_format.startswith("/api/"):
+        return _default_unique_id(route)
+    tag = str(route.tags[0]) if route.tags else "api"
+    singular = tag[:-1] if tag.endswith("s") else tag
+    parts = [p for p in route.name.split("_") if p not in {tag, singular}]
+    return f"{tag}_{'_'.join(parts)}" if parts else tag
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     settings.temp_dir.mkdir(parents=True, exist_ok=True)
-    yield
+    # FastMCP's streamable-HTTP transport only starts inside its own app's lifespan; nest it
+    # here (the MCP app is built in create_app and stashed on app.state, so it exists by now).
+    mcp_app = getattr(app.state, "mcp_app", None)
+    if mcp_app is None:
+        yield
+    else:
+        async with mcp_app.lifespan(app):
+            yield
 
 
 def create_app() -> FastAPI:
@@ -36,6 +61,8 @@ def create_app() -> FastAPI:
         version="0.1.0",
         summary="Async FastAPI backend with pluggable storage + database abstractions.",
         lifespan=lifespan,
+        generate_unique_id_function=_operation_id,
+        servers=[{"url": "/", "description": settings.environment}],
     )
     # Backend APIs.
     app.include_router(health.router)
@@ -48,7 +75,7 @@ def create_app() -> FastAPI:
     # before the SPA so those paths reach the agent, not the SPA fallback.
     app.include_router(agent.build_router())
 
-    @app.get("/api/me")
+    @app.get("/api/me", tags=["identity"])
     async def me(request: Request) -> dict[str, Any]:
         """Identity the SPA shows — from IAP in prod (ADR-0004), null when no IAP.
 
@@ -64,22 +91,29 @@ def create_app() -> FastAPI:
             "permissions": rbac.permissions_for(roles),
         }
 
-    @app.get("/api/auth/personas")
+    @app.get("/api/auth/personas", tags=["identity"])
     async def personas() -> list[dict[str, Any]]:
         """Switchable test identities (non-prod only) so RBAC mappings can be exercised."""
         return rbac.personas(settings.environment)
 
-    @app.get("/api/directory")
+    @app.get("/api/directory", tags=["identity"])
     async def directory() -> dict[str, dict[str, str]]:
         """Pseudonymous-id -> {email, name} lookup so the SPA can render human names for the
         user_ids on shared assets/folders. Any signed-in user may read it."""
         return rbac.directory(user_roles=settings.rbac_user_roles)
 
-    @app.get("/api/groups")
+    @app.get("/api/groups", tags=["identity"])
     async def groups(manager: Annotated[GroupManager, Depends(get_group_manager)]) -> list[dict[str, str]]:
         """Read-only group listing (group_id + name, NO membership) so any signed-in user can
         discover groups to share with. Membership and CRUD stay admin-only (/api/admin/groups)."""
         return [{"group_id": g.group_id, "name": g.name} for g in await manager.list()]
+
+    # Expose the assembled /api/* surface as MCP tools (another interface to the core API).
+    # Mounted BEFORE the SPA so /mcp/* isn't swallowed by the client-routing fallback; its
+    # lifespan is nested in `lifespan` via app.state (see above).
+    base_url = settings.self_base_url or f"http://127.0.0.1:{settings.port}"
+    app.state.mcp_app = build_mcp(app, base_url=base_url).http_app(path="/")
+    app.mount("/mcp", app.state.mcp_app)
 
     _mount_frontend(app, settings)
     return app

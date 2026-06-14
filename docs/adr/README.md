@@ -19,6 +19,7 @@ toward general, reusable principles over one-off specifics.
 | [0008](adr-0008-folders-groups-unified-sharing.md) | Folders, groups, unified file/folder sharing | Accepted · implemented |
 | [0009](adr-0009-theming-and-live-brandpacks.md) | Dark/light theming + live brandpack design tokens | Accepted · implemented |
 | [0010](adr-0010-agent-web-search-grounding.md) | Agent web-search grounding via an AgentTool sub-agent | Accepted · implemented |
+| [0011](adr-0011-core-api-mcp-and-cli.md) | Core API is the hub; MCP, CLI, and agent are interfaces to it | Accepted · implemented |
 
 ## Format
 
