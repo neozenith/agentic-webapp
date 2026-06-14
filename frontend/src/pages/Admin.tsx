@@ -10,7 +10,7 @@ const usd = (n: number) => `$${n.toFixed(6)}`;
 
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
-    <div className="flex flex-col">
+    <div data-testid={`stat-${label}`} className="flex flex-col">
       <span className="text-3xl font-bold text-primary tabular-nums">{value}</span>
       <span className="text-muted-foreground text-sm">{label}</span>
     </div>

@@ -201,6 +201,7 @@ export function Chat() {
               {m.role === "user" ? "you" : "agent"}
             </span>
             <div
+              data-testid={`msg-${m.role}`}
               className={cn(
                 "max-w-[80%] rounded-xl px-3.5 py-2.5",
                 m.role === "user"
