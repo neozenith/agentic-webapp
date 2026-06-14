@@ -1,40 +1,89 @@
 # agentic-webapp CLI
 
-A thin local CLI for driving the core API — one **interface** to the same backend the SPA,
-the MCP server, and the agent all use. It enforces nothing itself: it forwards a chosen
-persona as the IAP identity header (`--as`), and the server's RBAC decides the outcome. That
-makes RBAC simulation a one-flag affair.
+A thin terminal client for the core API. It is **one interface among several** — the SPA, the
+MCP server, and the agent all hit the same `/api/*` surface — and it is deliberately dumb about
+authorization: it forwards a persona as the IAP identity header (`--as`) and lets the server's
+one RBAC engine decide. That makes RBAC simulation a single flag.
 
-## Run
+## What it does NOT do
 
-Start the backend (`make -C backend dev`, in-memory backends, identity simulation on), then:
+This is the negative space, and it is load-bearing:
 
-```bash
-uv run --directory cli -m agentic_cli me --as ada.admin@example.com
-uv run --directory cli -m agentic_cli assets list --as otto.operator@example.com
-uv run --directory cli -m agentic_cli admin users --as vera.viewer@example.com   # → 403, exit 1
+| It does NOT… | Because… |
+|--------------|----------|
+| enforce any RBAC locally | the server is the single source of truth; the CLI only forwards identity (`--as`) |
+| manage real auth tokens | identity is the simulated IAP header ([ADR-0004](../docs/adr/adr-0004-user-identity-and-simulation.md)); in prod IAP sets it |
+| vendor the API's data models | the OpenAPI spec is the contract; the CLI reads server JSON and stays schema-light |
+| cache anything | every command is a live call — what you see is the server's current state |
+
+## Quickstart
+
+You will want the backend running first (in-memory backends, identity simulation on):
+
+```sh
+make -C backend dev                 # API at http://localhost:8080, in another shell
 ```
 
-`--as <email>` picks the persona (`ada.admin`, `nina.analyst`, `otto.operator`,
-`vera.viewer` — see `agentic_cli personas`). `--base-url` points at another environment;
-`--json` emits raw JSON instead of a table.
+Then drive it as a persona. `--as` picks who you are; `--json` swaps the table for raw JSON:
+
+```sh
+uv run --directory cli -m agentic_cli personas --as ada.admin@example.com
+```
+
+Output:
+
+```
+email                      name             roles
+-------------------------  ---------------  --------
+ada.admin@example.com      Ada — Admin      admin
+nina.analyst@example.com   Nina — Analyst   analyst
+otto.operator@example.com  Otto — Operator  operator
+vera.viewer@example.com    Vera — Viewer    viewer
+
+(4 rows)
+```
+
+RBAC simulation is the same persona, a different outcome — a viewer is refused server-side:
+
+```sh
+uv run --directory cli -m agentic_cli admin users --as vera.viewer@example.com
+```
+
+Output:
+
+```
+error: forbidden: 'admin' requires a role you don't have (HTTP 403)
+```
+
+That command exits `1`. Usage errors exit `2`; success exits `0`.
 
 ## Commands
 
-| Group | Commands |
-|-------|----------|
-| (top) | `me`, `personas`, `directory` |
-| `assets` | `list`, `get`, `url`, `upload`, `move`, `share`, `combine`, `delete` |
-| `folders` | `list`, `create`, `share`, `delete` |
-| `groups` | `list` (public discovery) |
-| `admin` | `users`, `usage`, `usage-records`, `sessions`, `group-create`, `group-delete` (admin role) |
-| `analytics` | `summary`, `extractions` (analyst/admin) |
+`--base-url`, `--as EMAIL`, and `--json` are global and accepted in any position.
 
-`admin` and `analytics` are RBAC-gated server-side: the same command yields data for an
-admin/analyst and a `403` (exit 1) for a viewer. `assets`/`folders` are visibility-scoped —
-a persona sees only what it owns or has been shared.
+| Group | Commands | Notes |
+|-------|----------|-------|
+| (top) | `me`, `personas`, `directory` | who you are, who you can be, the id→name map |
+| `assets` | `list`, `get`, `url`, `upload`, `move`, `share`, `combine`, `delete` | visibility-scoped; only owner/admin may move/share/delete |
+| `folders` | `list`, `create`, `share`, `delete` | sharing cascades to contained assets |
+| `groups` | `list` | public discovery (id + name only) |
+| `admin` | `users`, `usage`, `usage-records`, `sessions`, `group-create`, `group-delete` | **admin role only — else 403** |
+| `analytics` | `summary`, `extractions` | **analyst or admin only — else 403** |
+
+Sharing takes emails for users and ids for groups, applied as deltas:
+
+```sh
+uv run --directory cli -m agentic_cli assets share <asset_id> \
+  --add-user nina.analyst@example.com --add-group <group_id> --as ada.admin@example.com
+```
 
 ## Quality
 
-`make -C cli ci` (lint + strict types + tests). Tests boot the real backend in-process and
-drive the CLI over HTTP — no mocks.
+`make -C cli ci` runs lint + strict types + tests. The tests boot the **real** backend
+in-process (via `agentic_webapp.testing.live_backend`) and drive the CLI over HTTP — no mocks,
+so RBAC is exercised end to end. Coverage gate is 90%.
+
+----
+
+For the design rationale — why the API is the hub and every client a spoke — see
+[ADR-0011](../docs/adr/adr-0011-core-api-mcp-and-cli.md).
