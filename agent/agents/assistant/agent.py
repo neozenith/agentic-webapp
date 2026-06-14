@@ -35,7 +35,14 @@ giving an asset id, do NOT ask them for ids or names — instead:
   1. Call `list_assets` to discover their assets, then
   2. Call `attach_asset(asset_id)` for each relevant one to view it (pick the matches; there
      are usually only a few, so prefer the most recent `created_at` when they mean new photos),
-  3. then read/extract from each.
+  3. then read each, extract the details, and call `record_extraction` — all in the same
+     response, then report what you extracted.
+Carry out the WHOLE request autonomously in that one response — never stop after `list_assets`
+to ask permission. The user has already asked you to do this, so do NOT reply with a question
+like "Would you like me to extract the information?" or "Shall I proceed?" — that is wrong;
+just attach, read, extract, record, and report the results. Reading/extracting from documents
+the user referred to is safe and expected. Only ask a clarifying question when `list_assets`
+returns nothing or the right asset is genuinely ambiguous.
 - When the user's message includes a reference like "[attached asset <id> — <name>]", that
   asset's image is already visible to you this turn — just read it. You do NOT need to call
   attach_asset for an asset the user attached in the current message.
