@@ -11,15 +11,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import socket
-import threading
-import time
 from collections.abc import Iterator
 from typing import Any
 
 import pytest
-import uvicorn
+from agentic_webapp.testing import live_backend
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
@@ -28,47 +24,12 @@ ANALYST = "nina.analyst@example.com"
 VIEWER = "vera.viewer@example.com"
 
 
-def _free_port() -> int:
-    sock = socket.socket()
-    sock.bind(("127.0.0.1", 0))
-    port: int = sock.getsockname()[1]
-    sock.close()
-    return port
-
-
 @pytest.fixture(scope="module")
 def mcp_url() -> Iterator[str]:
-    """A real backend on an ephemeral port with the MCP mounted, identity-simulation on, and
-    the loopback base-url pinned to the same port. Module-scoped: boot once, probe many times."""
-    from agentic_webapp.config import get_settings
-    from agentic_webapp.main import create_app
-
-    port = _free_port()
-    keys = ("ENVIRONMENT", "TRUST_FORWARDED_USER", "SELF_BASE_URL", "PORT")
-    prev = {k: os.environ.get(k) for k in keys}
-    os.environ.update(
-        ENVIRONMENT="dev",
-        TRUST_FORWARDED_USER="true",
-        SELF_BASE_URL=f"http://127.0.0.1:{port}",
-        PORT=str(port),
-    )
-    get_settings.cache_clear()
-    server = uvicorn.Server(uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning"))
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    while not server.started:  # pragma: no cover — tight startup spin
-        time.sleep(0.05)
-    try:
-        yield f"http://127.0.0.1:{port}/mcp/"
-    finally:
-        server.should_exit = True
-        thread.join(timeout=5)
-        for key, value in prev.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
-        get_settings.cache_clear()
+    """The MCP endpoint of a real backend booted on a loopback port (shared boot protocol in
+    agentic_webapp.testing). Module-scoped: boot once, probe many times."""
+    with live_backend() as base_url:
+        yield f"{base_url}/mcp/"
 
 
 def _client(url: str, email: str | None) -> Client:
