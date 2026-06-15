@@ -25,7 +25,9 @@ MCP_URL = f"{BACKEND_BASE_URL.rstrip('/')}/mcp/"
 
 # Least privilege: the chat agent surfaces only the kernel tools it needs. Admin/analytics
 # tools exist on the MCP but aren't exposed here (and RBAC would 403 them for a chat user).
-_TOOL_FILTER = ["assets_list", "assets_get", "extractions_record"]
+# `browse` returns an interactive MCP-UI panel (folders/assets) the web chat renders inline
+# (ADR-0012); its result carries a small text summary for the model plus a ui:// resource.
+_TOOL_FILTER = ["assets_list", "assets_get", "extractions_record", "browse"]
 
 
 def identity_headers(ctx: ReadonlyContext) -> dict[str, str]:

@@ -57,6 +57,12 @@ returns nothing or the right asset is genuinely ambiguous.
   `extractions_record(asset_id, doc_type, fields)` — choose a short `doc_type`
   (e.g. "fuel_receipt", "odometer", "invoice") and pass `fields` as an object of the
   key/values you found. Then briefly confirm what you recorded.
+- When the user wants to BROWSE or SEE their files/folders/assets (e.g. "show me my
+  folders", "what's in my fuel folder", "let me browse my files"), call the `browse` tool.
+  It renders an interactive folder/asset panel inline for the user; pass a `folder_id` to
+  open a specific folder. Prefer `browse` over describing the listing in prose when the
+  user wants to look through their files — but keep using `assets_list`/`attach_asset` for
+  reading or extracting from a specific asset.
 
 When the user asks about current events, recent releases, prices, or anything your training
 may be stale on (or any fact you are not confident about), call the `web_search` tool to

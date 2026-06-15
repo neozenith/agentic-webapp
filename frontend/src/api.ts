@@ -85,9 +85,36 @@ export function sessionTitle(session: AdkSession | null): string | null {
   return session?.state?.title ?? null;
 }
 
+/** A `browse` tool invocation surfaced from the agent's events: the folder it opened
+ * (null = root). The web chat renders an interactive MCP-UI panel for each by fetching
+ * /ui/browse (ADR-0012) — the same renderer Claude Desktop gets from the MCP tool. */
+export interface BrowseRef {
+  folderId: string | null;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
+  // Interactive browse panels the agent opened this turn (rendered inline under the text).
+  browses?: BrowseRef[];
+}
+
+/** The MCP-UI resource backing one browse panel: `html` is the sandboxed-iframe content. */
+export interface UiResource {
+  uri: string;
+  mimeType: string;
+  html: string;
+}
+
+/** Fetch a browse panel's UI resource (root or a specific folder) for inline rendering and
+ * drill-in. Hits the web-only /ui/browse proxy, which reuses the server's render_browse with
+ * the caller's identity — so contents are RBAC-scoped exactly like the MCP `browse` tool. */
+export async function browseUi(folderId: string | null = null): Promise<UiResource> {
+  const query = folderId ? `?folder_id=${encodeURIComponent(folderId)}` : "";
+  const resp = await apiFetch(`/ui/browse${query}`);
+  if (!resp.ok) throw new Error(`browse ui error ${resp.status}`);
+  const block = (await resp.json()) as { resource: { uri: string; mimeType: string; text: string } };
+  return { uri: block.resource.uri, mimeType: block.resource.mimeType, html: block.resource.text };
 }
 
 /** Create a session. The SERVER mints the id (POST .../sessions with no id in the path);
@@ -150,8 +177,32 @@ export function sessionToTurns(session: AdkSession): SessionTurn[] {
   return turns;
 }
 
+/** The agent's reply to one turn: the prose plus any interactive browse panels it opened. */
+export interface AgentReply {
+  text: string;
+  browses: BrowseRef[];
+}
+
+/** Pull the user-visible text and any `browse` tool-calls out of a turn's ADK events. The
+ * browse panel is rendered from the tool CALL (which ADK reliably surfaces), not its result
+ * — so the web host never depends on ADK forwarding the embedded ui:// resource. */
+export function eventsToReply(events: AdkEvent[]): AgentReply {
+  const parts: string[] = [];
+  const browses: BrowseRef[] = [];
+  for (const event of events) {
+    for (const part of event.content?.parts ?? []) {
+      if (part.text) parts.push(part.text);
+      if (part.functionCall?.name === "browse") {
+        const fid = part.functionCall.args?.folder_id;
+        browses.push({ folderId: typeof fid === "string" ? fid : null });
+      }
+    }
+  }
+  return { text: parts.join(""), browses };
+}
+
 /** Send a message to the agent on an existing server-created session; return its reply. */
-export async function runAgent(userId: string, sessionId: string, text: string): Promise<string> {
+export async function runAgent(userId: string, sessionId: string, text: string): Promise<AgentReply> {
   const resp = await apiFetch("/run", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -164,13 +215,7 @@ export async function runAgent(userId: string, sessionId: string, text: string):
   });
   if (!resp.ok) throw new Error(`agent error ${resp.status}`);
   const events: AdkEvent[] = await resp.json();
-  const parts: string[] = [];
-  for (const event of events) {
-    for (const part of event.content?.parts ?? []) {
-      if (part.text) parts.push(part.text);
-    }
-  }
-  return parts.join("");
+  return eventsToReply(events);
 }
 
 export interface UsageBucket {
