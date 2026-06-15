@@ -2,7 +2,9 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
 import {
+  browseUi,
   createSession,
+  eventsToReply,
   fetchUsage,
   fetchUsageRecords,
   getMe,
@@ -112,22 +114,61 @@ describe("getSession", () => {
   });
 });
 
+describe("eventsToReply", () => {
+  it("concatenates text parts and ignores non-browse tool calls", () => {
+    expect(
+      eventsToReply([
+        { content: { parts: [{ text: "Hello " }, { text: "world" }] } },
+        { content: { parts: [{ functionCall: { name: "assets_list", args: {} } }] } },
+        { content: { parts: [{}] } },
+      ]),
+    ).toEqual({ text: "Hello world", browses: [] });
+  });
+
+  it("surfaces a browse tool call as a panel ref (folder id or root)", () => {
+    expect(
+      eventsToReply([
+        { content: { parts: [{ functionCall: { name: "browse", args: { folder_id: "f1" } } }] } },
+        { content: { parts: [{ text: "here you go" }] } },
+        { content: { parts: [{ functionCall: { name: "browse", args: {} } }] } }, // no id → root
+      ]),
+    ).toEqual({ text: "here you go", browses: [{ folderId: "f1" }, { folderId: null }] });
+  });
+});
+
 describe("runAgent", () => {
-  it("concatenates the text parts of the returned events", async () => {
+  it("returns the reply text from the posted run", async () => {
     server.use(
-      http.post("/run", () =>
-        HttpResponse.json([
-          { content: { parts: [{ text: "Hello " }, { text: "world" }] } },
-          { content: { parts: [{}] } },
-        ]),
-      ),
+      http.post("/run", () => HttpResponse.json([{ content: { parts: [{ text: "Hello " }, { text: "world" }] } }])),
     );
-    expect(await runAgent("uid", "s1", "hi")).toBe("Hello world");
+    expect(await runAgent("uid", "s1", "hi")).toEqual({ text: "Hello world", browses: [] });
   });
 
   it("throws on agent error", async () => {
     server.use(http.post("/run", () => new HttpResponse(null, { status: 500 })));
     await expect(runAgent("uid", "s1", "hi")).rejects.toThrow("agent error 500");
+  });
+});
+
+describe("browseUi", () => {
+  it("unwraps the embedded ui:// resource block into uri/mimeType/html", async () => {
+    server.use(
+      http.get("/ui/browse", ({ request }) => {
+        const url = new URL(request.url);
+        const fid = url.searchParams.get("folder_id");
+        return HttpResponse.json({
+          type: "resource",
+          resource: { uri: `ui://browse/${fid ?? "root"}`, mimeType: "text/html", text: `<h1>${fid ?? "root"}</h1>` },
+        });
+      }),
+    );
+    expect(await browseUi()).toEqual({ uri: "ui://browse/root", mimeType: "text/html", html: "<h1>root</h1>" });
+    expect(await browseUi("f1")).toEqual({ uri: "ui://browse/f1", mimeType: "text/html", html: "<h1>f1</h1>" });
+  });
+
+  it("throws on error", async () => {
+    server.use(http.get("/ui/browse", () => new HttpResponse(null, { status: 500 })));
+    await expect(browseUi()).rejects.toThrow("browse ui error 500");
   });
 });
 

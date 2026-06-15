@@ -2,6 +2,7 @@ import { Paperclip, SendHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { ChatUIResource } from "@/components/ChatUIResource";
 import { Markdown } from "@/components/Markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -153,7 +154,9 @@ export function Chat() {
     setBusy(true);
     try {
       const reply = await runAgent(userId, sessionId, outgoing);
-      setMessages((m) => [...m, { role: "assistant", text: reply || "(no reply)" }]);
+      // Show prose if any; a browse-only turn has no prose but renders its panel(s) below.
+      const text = reply.text || (reply.browses.length > 0 ? "" : "(no reply)");
+      setMessages((m) => [...m, { role: "assistant", text, browses: reply.browses }]);
       // The summariser titles the session in the background after a reply; pick it up.
       if (!title) {
         getSession(userId, sessionId)
@@ -200,17 +203,24 @@ export function Chat() {
             <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
               {m.role === "user" ? "you" : "agent"}
             </span>
-            <div
-              data-testid={`msg-${m.role}`}
-              className={cn(
-                "max-w-[80%] rounded-xl px-3.5 py-2.5",
-                m.role === "user"
-                  ? "whitespace-pre-wrap bg-secondary text-secondary-foreground"
-                  : "border border-border bg-background/60",
-              )}
-            >
-              {m.role === "assistant" ? <Markdown>{m.text}</Markdown> : <UserMessage text={m.text} />}
-            </div>
+            {(m.role === "user" || m.text) && (
+              <div
+                data-testid={`msg-${m.role}`}
+                className={cn(
+                  "max-w-[80%] rounded-xl px-3.5 py-2.5",
+                  m.role === "user"
+                    ? "whitespace-pre-wrap bg-secondary text-secondary-foreground"
+                    : "border border-border bg-background/60",
+                )}
+              >
+                {m.role === "assistant" ? <Markdown>{m.text}</Markdown> : <UserMessage text={m.text} />}
+              </div>
+            )}
+            {/* Interactive MCP-UI browse panels the agent opened this turn (ADR-0012). */}
+            {m.browses?.map((b, bi) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a message's panels are fixed and never reordered
+              <ChatUIResource key={bi} folderId={b.folderId} />
+            ))}
           </div>
         ))}
         {busy && (

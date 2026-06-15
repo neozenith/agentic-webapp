@@ -132,6 +132,35 @@ describe("Chat", () => {
     expect(img).toHaveAttribute("src", "/api/assets/a1/content");
   });
 
+  it("renders an inline browse panel when the agent calls the browse tool", async () => {
+    server.use(
+      me,
+      http.get("/apps/assistant/users/uid/sessions/s1", () => HttpResponse.json({ id: "s1", events: [] })),
+      http.get("/ui/browse", () =>
+        HttpResponse.json({
+          type: "resource",
+          resource: { uri: "ui://browse/root", mimeType: "text/html", text: "<h1>Folders</h1>" },
+        }),
+      ),
+      http.post("/run", () =>
+        HttpResponse.json([
+          { content: { parts: [{ functionCall: { name: "browse", args: {} } }] } },
+          { content: { parts: [{ text: "Here are your files:" }] } },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    renderChat("/chat/s1");
+    await screen.findByText(/Ask the agent something/i);
+    await user.type(screen.getByPlaceholderText(/Type a message/i), "show my files");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+    expect(await screen.findByText("Here are your files:")).toBeInTheDocument();
+    // The MCP-UI panel mounts as a sandboxed iframe carrying the fetched HTML.
+    const frame = (await screen.findByTitle("Asset browser")) as HTMLIFrameElement;
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(frame.getAttribute("srcdoc")).toContain("Folders");
+  });
+
   it("attaches a photo (upload → asset) and references its id in the message", async () => {
     let sentText = "";
     server.use(

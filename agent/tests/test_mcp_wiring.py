@@ -21,7 +21,7 @@ def test_identity_headers_empty_when_anonymous() -> None:
 
 def test_toolset_is_filtered_to_kernel_chat_tools() -> None:
     assert isinstance(mcp.build_mcp_toolset(), McpToolset)
-    assert mcp._TOOL_FILTER == ["assets_list", "assets_get", "extractions_record"]
+    assert mcp._TOOL_FILTER == ["assets_list", "assets_get", "extractions_record", "browse"]
     assert mcp.MCP_URL.endswith("/mcp/")
 
 

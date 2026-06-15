@@ -18,7 +18,7 @@ from fastapi.utils import generate_unique_id as _default_unique_id
 from . import rbac
 from .api.auth import iap_email, require_area
 from .api.deps import get_group_manager
-from .api.routes import admin, agent, analytics, assets, extractions, folders, health
+from .api.routes import admin, agent, analytics, assets, extractions, folders, health, ui
 from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
@@ -77,6 +77,9 @@ def create_app() -> FastAPI:
     # Scoped proxy to the agent sidecar (ADK run endpoints + /dev-ui), registered
     # before the SPA so those paths reach the agent, not the SPA fallback.
     app.include_router(agent.build_router())
+    # Web-only MCP-UI drill-in proxy (/ui/browse). Not in OpenAPI, not an MCP tool — it
+    # reuses the same render_browse as the MCP `browse` tool (ADR-0012).
+    app.include_router(ui.router)
 
     @app.get("/api/me", tags=["identity"])
     async def me(request: Request) -> dict[str, Any]:

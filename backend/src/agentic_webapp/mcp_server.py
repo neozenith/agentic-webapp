@@ -18,12 +18,15 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+import mcp.types as mcp_types
 from fastapi import FastAPI
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
 from fastmcp.server.providers.openapi import MCPType, RouteMap
+from fastmcp.tools import ToolResult
 
 from .api.auth import IAP_USER_HEADER, INTERNAL_VIEWER_HEADER
+from .mcp_ui import browse_summary, fetch_visible, render_browse
 
 # Identity headers forwarded from the MCP client to the core API. Lower-cased because
 # get_http_headers() returns lower-cased keys; httpx header keys are case-insensitive.
@@ -49,13 +52,33 @@ async def _forward_identity(request: httpx.Request) -> None:
             request.headers[key] = value
 
 
+def _register_ui_tools(server: FastMCP[Any], client: httpx.AsyncClient) -> None:
+    """Hand-authored UI tools layered over the OpenAPI projection (ADR-0012). They run inside
+    the FastMCP request context, so `_forward_identity` carries the caller's persona on any
+    /api/* fetch they make — inheriting RBAC exactly like a projected tool."""
+
+    @server.tool
+    async def browse(folder_id: str | None = None) -> ToolResult:
+        """Browse the user's folders and assets as an interactive UI panel. Returns a short
+        text summary for the model plus an embedded io.modelcontextprotocol/ui resource for
+        the host to render (HTML in a sandboxed iframe; clicking a folder drills in). Pass a
+        folder_id to open that folder (omit for the root)."""
+        folders, assets = await fetch_visible(client)
+        summary = browse_summary(folders, assets, folder_id)
+        ui = render_browse(folders, assets, folder_id=folder_id)
+        return ToolResult(content=[mcp_types.TextContent(type="text", text=summary), ui])
+
+
 def build_mcp(app: FastAPI, *, base_url: str) -> FastMCP[Any]:
     """An MCP server exposing the app's /api/* operations as tools, calling back into the
-    running app over loopback HTTP with per-request identity forwarding."""
+    running app over loopback HTTP with per-request identity forwarding. Plus a narrow,
+    hand-authored UI-tool layer (ADR-0012) that returns MCP-UI resources."""
     client = httpx.AsyncClient(base_url=base_url, event_hooks={"request": [_forward_identity]})
-    return FastMCP.from_openapi(
+    server = FastMCP.from_openapi(
         openapi_spec=app.openapi(),
         client=client,
         name="agentic-webapp",
         route_maps=_ROUTE_MAPS,
     )
+    _register_ui_tools(server, client)
+    return server
