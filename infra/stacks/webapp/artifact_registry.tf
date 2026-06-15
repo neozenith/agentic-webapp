@@ -19,7 +19,44 @@ resource "google_artifact_registry_repository_iam_member" "runtime_reader" {
 }
 
 locals {
-  # Convenience: the fully-qualified image base. Append :<tag> when pushing.
-  #   <region>-docker.pkg.dev/<project>/<repo>/<service>
-  image_base = "${var.region}-docker.pkg.dev/${local.project_id}/${google_artifact_registry_repository.app.repository_id}/${var.service_name}"
+  # Fully-qualified image bases (append :<tag> when pushing). Both images live in the
+  # one repo; they differ only by the trailing image name.
+  #   backend: <region>-docker.pkg.dev/<project>/<repo>/<service>
+  #   agent:   <region>-docker.pkg.dev/<project>/<repo>/agent
+  image_base       = "${var.region}-docker.pkg.dev/${local.project_id}/${google_artifact_registry_repository.app.repository_id}/${var.service_name}"
+  agent_image_base = "${var.region}-docker.pkg.dev/${local.project_id}/${google_artifact_registry_repository.app.repository_id}/agent"
+
+  # Content-addressed tags: a hash of each image's REAL Docker-context inputs, so an
+  # image rebuilds (build.tf) and Cloud Run gets a new revision only on a real source
+  # change — the container analogue of AWS Lambda's source_code_hash. The hashed dirs
+  # mirror each Dockerfile's COPY set:
+  #   backend image = backend/ + frontend/ (SPA bundled in) + libs/ (shared core)
+  #   agent image   = agent/ + libs/ (shared core)
+  # Generated dirs (node_modules, dist, .venv, __pycache__, .terraform) are excluded so
+  # they never perturb the hash.
+  backend_src_hash = substr(sha1(join("", [
+    for f in sort(flatten([
+      for d in ["backend", "frontend", "libs"] : [
+        for p in fileset("${path.module}/../../../${d}", "**") :
+        filesha1("${path.module}/../../../${d}/${p}")
+        if length(regexall("(^|/)(node_modules|dist|[.]venv|__pycache__|[.]terraform)(/|$)", p)) == 0
+      ]
+    ])) : f
+  ])), 0, 12)
+
+  agent_src_hash = substr(sha1(join("", [
+    for f in sort(flatten([
+      for d in ["agent", "libs"] : [
+        for p in fileset("${path.module}/../../../${d}", "**") :
+        filesha1("${path.module}/../../../${d}/${p}")
+        if length(regexall("(^|/)(node_modules|dist|[.]venv|__pycache__|[.]terraform)(/|$)", p)) == 0
+      ]
+    ])) : f
+  ])), 0, 12)
+
+  # The images Cloud Run runs: the freshly-built source-hash image by default; the
+  # matching var.* can pin a specific tag instead (a rollback), which also skips that
+  # image's build (see build.tf count).
+  app_image   = var.container_image != "" ? var.container_image : "${local.image_base}:${local.backend_src_hash}"
+  agent_image = var.agent_image != "" ? var.agent_image : "${local.agent_image_base}:${local.agent_src_hash}"
 }

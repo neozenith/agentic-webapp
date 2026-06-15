@@ -1,8 +1,10 @@
 name: Terraform
 description: |
-  Authenticate to GCP via Workload Identity Federation and run
-  terraform init + (plan | apply) for one environment of a single
-  infra/stacks/<stack> stack.
+  Authenticate to GCP via Workload Identity Federation and drive the curated `tfs`
+  CLI to run terraform init + (plan | apply) for one environment of a single
+  infra/stacks/<stack> stack. Container images build as first-class terraform
+  resources (infra/stacks/webapp/build.tf) sequenced by the dependency graph
+  (repo -> build -> Cloud Run), so this action carries no image-build step.
 
 inputs:
   env:
@@ -25,22 +27,6 @@ inputs:
     description: Terraform CLI version to install.
     required: false
     default: '1.10.0'
-  build_context:
-    description: If set, `gcloud builds submit` this dir and push build_image before terraform (app image build).
-    required: false
-    default: ''
-  build_image:
-    description: Full image ref (repo:tag) to build/push when build_context is set. Also pass it to terraform via TF_VAR_container_image at the job level.
-    required: false
-    default: ''
-  agent_build_context:
-    description: If set, also build/push the agent sidecar image from this dir's cloudbuild.yaml.
-    required: false
-    default: ''
-  agent_build_image:
-    description: Full image ref (repo:tag) for the agent image when agent_build_context is set. Pass to terraform via TF_VAR_agent_image at the job level.
-    required: false
-    default: ''
 
 runs:
   using: composite
@@ -55,50 +41,30 @@ runs:
       with:
         terraform_version: ${{ inputs.terraform_version }}
 
-    # Build + push the application image into the env's Artifact Registry, so the
-    # apply deploys real code (terraform reads the tag via TF_VAR_container_image).
-    - if: inputs.build_context != ''
-      uses: google-github-actions/setup-gcloud@v3
+    # gcloud: tfs's project guardrail (check_project) AND the in-DAG image builds
+    # (terraform_data.{image,agent_image} run `gcloud builds submit` via local-exec
+    # during apply). No Docker daemon is needed — Cloud Build builds remotely.
+    - uses: google-github-actions/setup-gcloud@v3
 
-    - if: inputs.build_context != ''
-      name: Build & push image (${{ inputs.build_image }})
+    # uv: runs the curated `tfs` CLI.
+    - uses: astral-sh/setup-uv@v8.1.0
+      with:
+        enable-cache: true
+        cache-dependency-glob: "infra/tfs/uv.lock"
+
+    # Everything below drives terraform through the curated `tfs` CLI — the single,
+    # opinionated deploy interface. `tfs plan` and `tfs apply` use IDENTICAL flags
+    # (a direct apply: no saved plan, no -target), so plan and apply never diverge.
+    - name: tfs init
       shell: bash
-      # Repo-root context + the service's cloudbuild.yaml, so a shared lib
-      # (libs/core) is in the Docker context. build_context = the service dir.
-      run: |
-        gcloud builds submit . \
-          --project "dbt-${{ inputs.env }}-jaffleshop" \
-          --config "${{ inputs.build_context }}/cloudbuild.yaml" \
-          --substitutions=_IMAGE="${{ inputs.build_image }}"
-
-    - if: inputs.agent_build_context != ''
-      name: Build & push agent image (${{ inputs.agent_build_image }})
-      shell: bash
-      run: |
-        gcloud builds submit . \
-          --project "dbt-${{ inputs.env }}-jaffleshop" \
-          --config "${{ inputs.agent_build_context }}/cloudbuild.yaml" \
-          --substitutions=_IMAGE="${{ inputs.agent_build_image }}"
-
-    - shell: bash
-      run: terraform -chdir=infra/stacks/${{ inputs.stack }} init -backend-config=./backends/${{ inputs.env }}.config -reconfigure
+      run: uv run --frozen --directory infra/tfs tfs init ${{ inputs.stack }} ${{ inputs.env }}
 
     - if: inputs.action == 'plan'
+      name: tfs plan
       shell: bash
-      run: |
-        terraform -chdir=infra/stacks/${{ inputs.stack }} validate
-        terraform -chdir=infra/stacks/${{ inputs.stack }} plan -input=false -no-color -var environment=${{ inputs.env }}
-
-    # Atomic plan-then-apply: if the plan step errors (bash -e), the apply
-    # step won't run because the prior step failed. The on-disk tfplan also
-    # guarantees apply executes exactly what plan showed — no drift between
-    # the two operations.
-    - if: inputs.action == 'apply'
-      name: terraform plan -out=tfplan
-      shell: bash
-      run: terraform -chdir=infra/stacks/${{ inputs.stack }} plan -input=false -no-color -out=tfplan -var environment=${{ inputs.env }}
+      run: uv run --frozen --directory infra/tfs tfs plan ${{ inputs.stack }} ${{ inputs.env }}
 
     - if: inputs.action == 'apply'
-      name: terraform apply tfplan
+      name: tfs apply
       shell: bash
-      run: terraform -chdir=infra/stacks/${{ inputs.stack }} apply -input=false -auto-approve tfplan
+      run: uv run --frozen --directory infra/tfs tfs apply ${{ inputs.stack }} ${{ inputs.env }}
