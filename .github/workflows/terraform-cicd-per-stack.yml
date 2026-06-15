@@ -31,26 +31,9 @@ on:
         description: Stack name under infra/stacks/.
         required: true
         type: string
-      build_context:
-        description: App build dir for `gcloud builds submit` (empty = no app image build).
-        required: false
-        type: string
-        default: ''
-      agent_build_context:
-        description: Agent sidecar build dir (empty = no agent image / no sidecar).
-        required: false
-        type: string
-        default: ''
-      image_name:
-        description: Artifact Registry repo + image name (empty = no app image; stack uses its terraform default).
-        required: false
-        type: string
-        default: ''
-      region:
-        description: Region hosting Artifact Registry / Cloud Run.
-        required: false
-        type: string
-        default: australia-southeast1
+      # The stack name is the only input. Container images build as first-class terraform
+      # resources (infra/stacks/<stack>/build.tf), sequenced by the dependency graph
+      # (repo -> build -> Cloud Run), so there is no CI image build to parameterize.
 
 permissions:
   contents: read
@@ -97,11 +80,10 @@ jobs:
       matrix:
         env: [dev, test, prod]
     env:
-      # Plan against the image this commit WOULD deploy (built at apply time), so
-      # the plan reflects the code change. Falls back to the stack's default image
-      # for stacks that don't build one.
-      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-{1}-jaffleshop/{2}/{2}:{3}', inputs.region, matrix.env, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
-      TF_VAR_agent_image: ${{ inputs.agent_build_context != '' && format('{0}-docker.pkg.dev/dbt-{1}-jaffleshop/{2}/agent:{3}', inputs.region, matrix.env, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # Images build in-DAG; Cloud Run runs the source-hash tags (local.app_image /
+      # local.agent_image), computed from the checked-out source, so the plan already
+      # reflects this commit's code. A TF_VAR_*_image would override the build, so only the
+      # IAP vars are passed through.
       # IAP custom OAuth client (prod env secrets; empty for dev/test). Keeps the
       # prod plan from showing google_iap_settings as removed.
       TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
@@ -130,9 +112,8 @@ jobs:
       pull-requests: write   # post the sticky comment
     env:
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
-      # So the delta diagram reflects this commit's image (dev), not the default.
-      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-dev-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
-      TF_VAR_agent_image: ${{ inputs.agent_build_context != '' && format('{0}-docker.pkg.dev/dbt-dev-jaffleshop/{1}/agent:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # The delta diagram reflects this commit's in-DAG source-hash images (local.app_image
+      # / local.agent_image), computed from the checked-out source.
     steps:
       - uses: actions/checkout@v6
       - name: Install graphviz (required by mingrammer diagrams)
@@ -230,8 +211,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     env:
-      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-dev-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
-      TF_VAR_agent_image: ${{ inputs.agent_build_context != '' && format('{0}-docker.pkg.dev/dbt-dev-jaffleshop/{1}/agent:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # Images build in-DAG from source (build.tf); a TF_VAR_*_image pin would override
+      # the build, so only the IAP vars are passed.
       # IAP on iff these are set (per-env GitHub secret); empty ⇒ public. dev is
       # public by design (ADR-0003), so these are normally absent.
       TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
@@ -245,10 +226,6 @@ jobs:
           action: apply
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.TF_SA }}
-          build_context: ${{ inputs.build_context }}
-          build_image: ${{ env.TF_VAR_container_image }}
-          agent_build_context: ${{ inputs.agent_build_context }}
-          agent_build_image: ${{ env.TF_VAR_agent_image }}
 
   # Merge / push to main — apply test.
   apply-test:
@@ -258,8 +235,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: test
     env:
-      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-test-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
-      TF_VAR_agent_image: ${{ inputs.agent_build_context != '' && format('{0}-docker.pkg.dev/dbt-test-jaffleshop/{1}/agent:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # Images build in-DAG from source (build.tf); a TF_VAR_*_image pin would override
+      # the build, so only the IAP vars are passed.
       # IAP on iff a test OAuth client secret is added to the test environment;
       # empty ⇒ public (current default). No code change needed to flip it on.
       TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
@@ -273,10 +250,6 @@ jobs:
           action: apply
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.TF_SA }}
-          build_context: ${{ inputs.build_context }}
-          build_image: ${{ env.TF_VAR_container_image }}
-          agent_build_context: ${{ inputs.agent_build_context }}
-          agent_build_image: ${{ env.TF_VAR_agent_image }}
 
   # Tag (v*) or manual dispatch — apply prod. Add required reviewers to the
   # "prod" GitHub Environment to gate this behind a human approval.
@@ -289,8 +262,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     env:
-      TF_VAR_container_image: ${{ inputs.image_name != '' && format('{0}-docker.pkg.dev/dbt-prod-jaffleshop/{1}/{1}:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
-      TF_VAR_agent_image: ${{ inputs.agent_build_context != '' && format('{0}-docker.pkg.dev/dbt-prod-jaffleshop/{1}/agent:{2}', inputs.region, inputs.image_name, github.sha) || 'us-docker.pkg.dev/cloudrun/container/hello' }}
+      # Images build in-DAG from source (build.tf); a TF_VAR_*_image pin would override
+      # the build, so only the IAP vars are passed.
       # Prod is IAP-gated and needs its custom OAuth client (no-org requirement).
       TF_VAR_iap_oauth_client_id: ${{ secrets.IAP_OAUTH_CLIENT_ID }}
       TF_VAR_iap_oauth_client_secret: ${{ secrets.IAP_OAUTH_CLIENT_SECRET }}
@@ -303,7 +276,3 @@ jobs:
           action: apply
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.TF_SA }}
-          build_context: ${{ inputs.build_context }}
-          build_image: ${{ env.TF_VAR_container_image }}
-          agent_build_context: ${{ inputs.agent_build_context }}
-          agent_build_image: ${{ env.TF_VAR_agent_image }}

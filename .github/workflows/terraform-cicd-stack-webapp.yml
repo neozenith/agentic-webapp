@@ -50,9 +50,8 @@ jobs:
     uses: ./.github/workflows/terraform-cicd-per-stack.yml
     with:
       stack: webapp
-      # The webapp stack ships an app image; CI builds backend/ and deploys it.
-      build_context: backend
-      image_name: agentic-webapp
-      # Also build the ADK agent sidecar image (agentic-webapp/agent).
-      agent_build_context: agent
+      # The stack name is all this caller forwards. Both images — the backend (FastAPI +
+      # bundled React SPA + libs/core) and the ADK agent sidecar — build in-DAG as
+      # terraform resources (infra/stacks/webapp/build.tf), sequenced by the dependency
+      # graph (repo -> builds -> Cloud Run).
     secrets: inherit

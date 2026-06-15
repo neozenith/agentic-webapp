@@ -27,9 +27,14 @@ variable "repository_id" {
 }
 
 variable "agent_image" {
-  description = "Container image for the ADK agent sidecar. Built by CI; defaults to the hello sample so plans work pre-build."
+  description = <<-EOT
+    OPTIONAL pin for the ADK agent sidecar image. Default "" ⇒ the stack builds the
+    agent image in-DAG (build.tf terraform_data.agent_image) and Cloud Run runs the
+    resulting source-hash tag (local.agent_image). Set a fully-qualified image ref to
+    pin/rollback to a specific tag instead (which also skips the agent build).
+  EOT
   type        = string
-  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+  default     = ""
 }
 
 variable "agent_model" {
@@ -46,13 +51,13 @@ variable "vertex_location" {
 
 variable "container_image" {
   description = <<-EOT
-    Container image to deploy. Defaults to Google's hello sample so the stack is
-    deployable BEFORE the app's own image exists. The application CD pipeline
-    overrides this (e.g. -var container_image=...) once it pushes a real image to
-    Artifact Registry.
+    OPTIONAL pin for the backend Cloud Run image. Default "" ⇒ the stack builds the
+    image in-DAG (build.tf terraform_data.image) and Cloud Run runs the resulting
+    source-hash tag (local.app_image). Set a fully-qualified image ref to pin/rollback
+    to a specific tag instead (which also skips the backend build — see build.tf count).
   EOT
   type        = string
-  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+  default     = ""
 }
 
 variable "container_port" {

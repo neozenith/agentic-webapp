@@ -40,7 +40,7 @@ resource "google_cloud_run_v2_service" "app" {
     # the agent sidecar on localhost (single public ingress). ---
     containers {
       name  = "backend"
-      image = var.container_image
+      image = local.app_image # built in-DAG by terraform_data.image (build.tf), or var.container_image pin
 
       # Surfaces the environment in the app UI/health payload (read as ENVIRONMENT
       # by the FastAPI Settings). K_REVISION is set by Cloud Run automatically.
@@ -119,7 +119,7 @@ resource "google_cloud_run_v2_service" "app" {
     # the dual-service model). No ports block: localhost-only, reached via the proxy. ---
     containers {
       name  = "agent"
-      image = var.agent_image
+      image = local.agent_image # built in-DAG by terraform_data.agent_image (build.tf), or var.agent_image pin
 
       env {
         name  = "GOOGLE_GENAI_USE_VERTEXAI"
@@ -188,7 +188,16 @@ resource "google_cloud_run_v2_service" "app" {
     }
   }
 
-  depends_on = [google_project_service.run, google_project_service.aiplatform]
+  # Both image builds must push BEFORE the service is created/updated, so the source-hash
+  # tags Cloud Run references already exist in Artifact Registry. terraform_data.*[0] is
+  # safe: when a var pins an image the build is count=0, but then var.* != "" so app_image
+  # / agent_image resolve to the pin and the (empty) depends_on list is simply skipped.
+  depends_on = [
+    google_project_service.run,
+    google_project_service.aiplatform,
+    terraform_data.image,
+    terraform_data.agent_image,
+  ]
 }
 
 # When IAP is off, allow unauthenticated invocation so the run.app URL is usable
