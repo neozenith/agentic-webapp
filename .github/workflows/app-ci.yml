@@ -74,6 +74,15 @@ jobs:
         with:
           terraform_version: "1.10.0"
       - uses: terraform-linters/setup-tflint@v4
+      # Cache the tflint ruleset plugins so warm runs skip the GitHub-API download (which
+      # intermittently 504s). Keyed on the tflint config that pins the plugin versions.
+      - name: Cache tflint plugins
+        uses: actions/cache@v5
+        with:
+          path: ~/.tflint.d/plugins
+          key: ${{ runner.os }}-tflint-${{ hashFiles('infra/.tflint.hcl') }}
+          restore-keys: |
+            ${{ runner.os }}-tflint-
       - uses: aquasecurity/setup-trivy@v0.2.6
         with:
           version: v0.71.0
@@ -85,4 +94,9 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "infra/tfs/uv.lock"
       - run: make -C infra install
-      - run: make -C infra ci
+      # GITHUB_TOKEN makes `tflint --init` authenticate plugin downloads (more reliable, no
+      # unauthenticated rate limit); the Makefile retries transient 504s on top of this.
+      - name: Run infra CI gate
+        run: make -C infra ci
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

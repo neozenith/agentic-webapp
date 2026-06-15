@@ -118,8 +118,19 @@ fix: ## Auto-fix: terraform fmt + ruff format/fix on the tfs CLI
 	uvx ruff format tfs
 	uvx ruff check tfs --fix
 
-lint: ## tflint (auto-inits plugins; idempotent)
-	tflint --init
+# `tflint --init` downloads ruleset plugins from the GitHub releases API, which
+# intermittently returns 504s (and is rate-limited when unauthenticated). Retry with
+# linear backoff so a transient API blip doesn't fail the whole lint/CI job. In CI also
+# set GITHUB_TOKEN (authenticated downloads are more reliable) and cache ~/.tflint.d/plugins
+# so warm runs skip the download entirely — see .github/workflows/app-ci.yml.
+TFLINT_INIT_RETRIES ?= 5
+lint: ## tflint (retries the flaky plugin download; idempotent)
+	@for i in $$(seq 1 $(TFLINT_INIT_RETRIES)); do \
+	  tflint --init && break; \
+	  if [ "$$i" -eq "$(TFLINT_INIT_RETRIES)" ]; then echo "tflint --init failed after $(TFLINT_INIT_RETRIES) attempts" >&2; exit 1; fi; \
+	  echo "tflint --init failed (attempt $$i/$(TFLINT_INIT_RETRIES)); retrying in $$((i * 5))s…" >&2; \
+	  sleep $$((i * 5)); \
+	done
 	tflint --recursive
 
 tfs-ci: ## tfs Python gate: ruff (warnings=errors) + mypy --strict + pytest >=90% coverage
