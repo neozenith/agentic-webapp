@@ -50,6 +50,12 @@ if (typeof globalThis.matchMedia === "undefined") {
     }) as MediaQueryList;
 }
 
+// jsdom implements no layout engine, so Element.scrollIntoView is absent. Install a real
+// no-op (not a mock) so the chat's auto-scroll-to-bottom effect runs without throwing.
+if (typeof Element.prototype.scrollIntoView === "undefined") {
+  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
+}
+
 // Start the MSW fake server once; reset handlers between tests; tear down at the end.
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());

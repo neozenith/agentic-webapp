@@ -7,7 +7,7 @@ import { MobileNavDrawer, Sidebar } from "@/components/Sidebar";
 export function App() {
   return (
     <NavDrawerProvider>
-      <div className="flex min-h-screen">
+      <div className="flex h-screen">
         <Sidebar />
         <MobileNavDrawer />
         {/* min-w-0 lets the content column shrink below its intrinsic width inside the flex row
@@ -15,7 +15,9 @@ export function App() {
         <div className="flex min-w-0 flex-1 flex-col">
           <Header />
           <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
-            <div className="mx-auto max-w-4xl">
+            {/* h-full lets a page (e.g. Chat) fill the viewport and scroll INTERNALLY rather
+                than growing the page; shorter pages are unaffected (content stays top-aligned). */}
+            <div className="mx-auto h-full max-w-4xl">
               <Outlet />
             </div>
           </main>

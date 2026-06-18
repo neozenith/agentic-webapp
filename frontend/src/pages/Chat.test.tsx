@@ -31,6 +31,20 @@ describe("Chat", () => {
     expect(await screen.findByText(/Ask the agent something/i)).toBeInTheDocument();
   });
 
+  it("renders the transcript inside a bounded scroll region (no infinite page growth)", async () => {
+    server.use(
+      me,
+      http.post("/apps/assistant/users/uid/sessions", () => HttpResponse.json({ id: "new-1" })),
+      http.get("/apps/assistant/users/uid/sessions/new-1", () => HttpResponse.json({ id: "new-1", events: [] })),
+    );
+    renderChat("/chat");
+    const scroll = await screen.findByTestId("chat-scroll");
+    // min-h-0 + overflow-y-auto is what makes the messages pane scroll instead of growing
+    // the page off-screen (the composer stays pinned below it).
+    expect(scroll.className).toContain("overflow-y-auto");
+    expect(scroll.className).toContain("min-h-0");
+  });
+
   it("rehydrates the transcript when resuming an existing session", async () => {
     server.use(
       me,

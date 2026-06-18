@@ -67,6 +67,8 @@ export function Chat() {
   // We hold a ref so focus can be restored once the reply lands — otherwise the user has to
   // click the box again before typing a follow-up.
   const messageInput = useRef<HTMLInputElement>(null);
+  // Scroll anchor at the end of the transcript, kept in view as messages arrive.
+  const bottomRef = useRef<HTMLDivElement>(null);
   // Guards against React StrictMode running the resolve effect twice (which would
   // otherwise create two server sessions for one /chat visit).
   const resolving = useRef(false);
@@ -115,6 +117,12 @@ export function Chat() {
   useEffect(() => {
     if (!busy && !loading && sessionId) messageInput.current?.focus();
   }, [busy, loading, sessionId]);
+
+  // Keep the newest message/panel in view as the (now bounded + scrollable) transcript grows.
+  useEffect(() => {
+    if (messages.length === 0 && !busy) return; // nothing to scroll to yet
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, busy]);
 
   // Upload a photo straight to the asset store (POST /api/assets — the same endpoint the
   // Asset Manager uses, so it's immediately visible there too). We then reference it by id
@@ -183,7 +191,7 @@ export function Chat() {
   }
 
   return (
-    <Card className="flex min-h-[70vh] flex-col gap-4 p-5">
+    <Card className="flex h-full min-h-0 flex-col gap-4 p-5">
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
           {title ? <span className="font-medium text-foreground">{title}</span> : null}
@@ -194,7 +202,9 @@ export function Chat() {
           New chat
         </Button>
       </div>
-      <div className="flex flex-1 flex-col gap-3">
+      {/* The ONLY scroll region: min-h-0 lets this flex child shrink below its content so
+          overflow-y-auto engages; the composer/error/attachment below stay pinned. */}
+      <div data-testid="chat-scroll" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {loading && <p className="text-muted-foreground">Loading session…</p>}
         {!loading && messages.length === 0 && <p className="text-muted-foreground">Ask the agent something…</p>}
         {messages.map((m, i) => (
@@ -231,6 +241,8 @@ export function Chat() {
             </div>
           </div>
         )}
+        {/* Scroll anchor: keep the latest message/panel in view as the conversation grows. */}
+        <div ref={bottomRef} />
       </div>
       {error && <p className="text-destructive">⚠️ {error}</p>}
       {attached && (
