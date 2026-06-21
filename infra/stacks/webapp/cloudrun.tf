@@ -233,6 +233,12 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "DBT_PROJECT_DIR"
         value = "/app"
       }
+      # Where Elementary materialises its observability metadata (pre-created in bigquery.tf).
+      # The sidecar's run-history endpoints read dbt_invocations / dbt_run_results from here.
+      env {
+        name  = "ELEMENTARY_DATASET"
+        value = google_bigquery_dataset.elementary.dataset_id
+      }
 
       resources {
         cpu_idle = true

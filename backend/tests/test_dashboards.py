@@ -73,6 +73,28 @@ def test_render_missing_dashboard_404(admin: TestClient) -> None:
     assert admin.get("/api/dashboards/nope/render").status_code == 404
 
 
+def test_render_timespine_grain_override(admin: TestClient) -> None:
+    """grain re-buckets time-series charts; the monthly line becomes quarterly (4 buckets/yr)."""
+    render = admin.get("/api/dashboards/fuel-overview/render", params={"grain": "quarter"}).json()
+    monthly = next(c for c in render["charts"] if c["chart_id"] == "monthly-spend")
+    assert len(monthly["figure"]["data"][0]["x"]) == 8  # 2 years × 4 quarters
+
+
+def test_render_timespine_date_range_clamps_kpi(admin: TestClient) -> None:
+    """start/end filter every time-aware chart — the total-spend KPI drops to the 2025 slice."""
+    full = admin.get("/api/dashboards/fuel-overview/render").json()
+    full_kpi = next(c for c in full["charts"] if c["chart_id"] == "kpi-total-spend")["value"]
+    clamped = admin.get(
+        "/api/dashboards/fuel-overview/render", params={"start": "2025-01-01", "end": "2025-12-31"}
+    ).json()
+    kpi = next(c for c in clamped["charts"] if c["chart_id"] == "kpi-total-spend")["value"]
+    assert 0 < kpi < full_kpi  # a strict subset of the full spend
+
+
+def test_render_rejects_bad_grain(admin: TestClient) -> None:
+    assert admin.get("/api/dashboards/fuel-overview/render", params={"grain": "fortnight"}).status_code == 400
+
+
 def test_dashboards_readable_by_viewer(app) -> None:
     """dashboards is a read-broad area (viewer + operator), unlike semantic/dbt."""
     c = TestClient(app)

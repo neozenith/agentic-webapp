@@ -1,0 +1,53 @@
+version: 2
+
+sources:
+  - name: consulting_raw
+    description: >
+      Raw consulting-engagement source tables, pre-created by Terraform in the
+      agentic_webapp dataset. The staging models cast types and pass columns
+      through; the marts bind their stable output contract to these.
+    # database = the GCP project (env-driven so dev/test/prod resolve correctly).
+    # schema = the BigQuery dataset that holds the raw tables.
+    database: "{{ env_var('GCP_PROJECT') }}"
+    schema: agentic_webapp
+    tables:
+      - name: raw_engagements
+        description: "One row per consulting engagement."
+        columns:
+          - name: engagement_id
+            description: "Unique id of the engagement (primary key)."
+            tests:
+              - not_null
+              - unique
+      - name: raw_time_entries
+        description: "One row per logged time entry against an engagement."
+        columns:
+          - name: time_entry_id
+            description: "Unique id of the time entry (primary key)."
+            tests:
+              - not_null
+              - unique
+      - name: raw_financials
+        description: "One row per engagement financial period."
+        columns:
+          - name: financial_id
+            description: "Unique id of the financial record (primary key)."
+            tests:
+              - not_null
+              - unique
+      - name: raw_deliverables
+        description: "One row per engagement deliverable."
+        columns:
+          - name: deliverable_id
+            description: "Unique id of the deliverable (primary key)."
+            tests:
+              - not_null
+              - unique
+      - name: raw_invoices
+        description: "One row per invoice issued for an engagement."
+        columns:
+          - name: invoice_id
+            description: "Unique id of the invoice (primary key)."
+            tests:
+              - not_null
+              - unique

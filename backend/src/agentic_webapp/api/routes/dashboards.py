@@ -14,14 +14,24 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 from agentic_core.database import DashboardManager, SemanticManager, SemanticQueryError
-from agentic_core.models import DashboardChart, DashboardSpec, SemanticQueryResult
-from fastapi import APIRouter, Depends, HTTPException
+from agentic_core.models import (
+    DashboardChart,
+    DashboardSpec,
+    SemanticEntity,
+    SemanticFilter,
+    SemanticModel,
+    SemanticQuery,
+    SemanticQueryResult,
+)
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ...figures import build_figure, kpi_value
 from ..deps import get_dashboard_manager, get_semantic_manager
 
 router = APIRouter(prefix="/api/dashboards", tags=["dashboards"])
+
+_GRAINS = ("day", "week", "month", "quarter", "year")
 
 DashboardDep = Annotated[DashboardManager, Depends(get_dashboard_manager)]
 SemanticDep = Annotated[SemanticManager, Depends(get_semantic_manager)]
@@ -97,10 +107,44 @@ async def delete_dashboard(dashboard_id: str, manager: DashboardDep) -> None:
     await manager.delete(dashboard_id)
 
 
+def _entity_of(model: SemanticModel, name: str) -> SemanticEntity | None:
+    return next((e for e in model.entities if e.name == name), None)
+
+
+def _parametrise(
+    query: SemanticQuery, entity: SemanticEntity | None, grain: str | None, start: str | None, end: str | None
+) -> SemanticQuery:
+    """Apply the dashboard's timespine controls to a chart query: override the time grain on
+    time-series charts, and clamp every time-aware chart to the [start, end] range by adding
+    filters on the entity's time dimension. KPI/categorical charts (no grain) keep their shape
+    but still respect the range, so the whole dashboard moves together."""
+    updates: dict[str, object] = {}
+    if grain and query.time_grain is not None:
+        updates["time_grain"] = grain
+    time_col = entity.time_dimension if entity else None
+    if time_col and (start or end):
+        extra = [f for f in (
+            SemanticFilter(field=time_col, op=">=", value=start) if start else None,
+            SemanticFilter(field=time_col, op="<=", value=end) if end else None,
+        ) if f is not None]
+        updates["filters"] = [*query.filters, *extra]
+    return query.model_copy(update=updates) if updates else query
+
+
 @router.get("/{dashboard_id}/render", response_model=DashboardRender)
-async def render_dashboard(dashboard_id: str, dashboards: DashboardDep, semantic: SemanticDep) -> DashboardRender:
-    """Run every chart's query and project it to a Plotly figure. A chart whose query fails
-    (e.g. its model was deleted) renders with an `error` instead of taking the page down."""
+async def render_dashboard(
+    dashboard_id: str,
+    dashboards: DashboardDep,
+    semantic: SemanticDep,
+    grain: str | None = Query(None, description="Override the time grain (day/week/month/quarter/year)."),
+    start: str | None = Query(None, description="Inclusive lower bound (ISO date) on each chart's time dimension."),
+    end: str | None = Query(None, description="Inclusive upper bound (ISO date) on each chart's time dimension."),
+) -> DashboardRender:
+    """Run every chart's query and project it to a Plotly figure. Optional timespine controls
+    (`grain`, `start`, `end`) re-bucket and date-filter the whole dashboard. A chart whose query
+    fails (e.g. its model was deleted) renders with an `error` instead of taking the page down."""
+    if grain is not None and grain not in _GRAINS:
+        raise HTTPException(status_code=400, detail=f"grain must be one of {_GRAINS}")
     spec = await dashboards.get(dashboard_id)
     if spec is None:
         raise HTTPException(status_code=404, detail="dashboard not found")
@@ -115,8 +159,9 @@ async def render_dashboard(dashboard_id: str, dashboards: DashboardDep, semantic
                 error="dashboard has no semantic model",
             ))
             continue
+        query = _parametrise(chart.query, _entity_of(model, chart.query.entity), grain, start, end)
         try:
-            result = await semantic.run_query(model, chart.query)
+            result = await semantic.run_query(model, query)
             rendered.append(ChartRender(
                 chart_id=chart.chart_id, title=chart.title, chart_type=chart.chart_type,
                 figure=build_figure(chart, result), value=kpi_value(chart, result), result=result,

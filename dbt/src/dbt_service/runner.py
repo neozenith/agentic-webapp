@@ -96,7 +96,12 @@ def scan_models(project_dir: Path) -> list[DbtModelInfo]:
         if materialized_match:
             materialized = materialized_match.group(1)
         else:
-            materialized = _DIR_MATERIALIZED.get(sql_path.parent.name, "view")
+            # Use the TOP-level dir under models/ (staging|marts), not the immediate
+            # parent, so nested domains like marts/consulting/*.sql still resolve to
+            # the right default materialization.
+            rel_parts = sql_path.relative_to(models_dir).parts
+            top_dir = rel_parts[0] if len(rel_parts) > 1 else ""
+            materialized = _DIR_MATERIALIZED.get(top_dir, "view")
         infos.append(
             DbtModelInfo(
                 name=name,

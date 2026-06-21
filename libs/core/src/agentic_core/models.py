@@ -242,6 +242,43 @@ class DbtRunResult(BaseModel):
     elapsed_seconds: float = 0.0
 
 
+class DbtInvocation(BaseModel):
+    """One dbt run, distilled from Elementary's `dbt_invocations` + `dbt_run_results` — the
+    overview scatter's datum (one point per run)."""
+
+    invocation_id: str
+    command: str = ""
+    run_started_at: str | None = None
+    run_completed_at: str | None = None
+    target_name: str = ""
+    dbt_version: str = ""
+    n_nodes: int = 0
+    wall_secs: float = 0.0
+    has_failures: bool = False
+
+
+class DbtGanttNode(BaseModel):
+    """One executed node on the run gantt: a bar on its thread lane."""
+
+    thread_id: str
+    node_id: str
+    name: str
+    resource_type: str = "model"
+    status: str = ""
+    start_offset_secs: float = 0.0
+    duration_secs: float = 0.0
+
+
+class DbtGantt(BaseModel):
+    """A single invocation's execution timeline (Elementary `dbt_run_results`): thread lanes
+    on the y-axis, seconds-from-wall-start on the x-axis."""
+
+    invocation_id: str
+    wall_secs: float = 0.0
+    threads: list[str] = Field(default_factory=list)
+    nodes: list[DbtGanttNode] = Field(default_factory=list)
+
+
 # ============================================================================
 # Dashboards — the AnalyticsManager's insight→pixels contract.
 # A chart binds a SemanticQuery (data) to a Plotly figure template (pixels); `encoding`

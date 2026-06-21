@@ -22,6 +22,16 @@ EXPECTED_MODELS = {
     "fct_fuel_purchases",
     "fct_maintenance",
     "agg_vehicle_costs_yearly",
+    "stg_consulting__engagements",
+    "stg_consulting__time_entries",
+    "stg_consulting__financials",
+    "stg_consulting__deliverables",
+    "stg_consulting__invoices",
+    "dim_engagements",
+    "fct_time_entries",
+    "fct_engagement_financials",
+    "fct_deliverables",
+    "fct_invoices",
 }
 
 
@@ -53,6 +63,15 @@ def test_scan_models_materialization(project_dir: Path) -> None:
     assert by_name["agg_vehicle_costs_yearly"].materialized == "table"
 
 
+def test_scan_models_nested_domain_materialization(project_dir: Path) -> None:
+    # Nested domains resolve materialization from the TOP-level dir (staging|marts),
+    # not the immediate parent (consulting).
+    by_name = {m.name: m for m in scan_models(project_dir)}
+    assert by_name["stg_consulting__engagements"].materialized == "view"
+    assert by_name["dim_engagements"].materialized == "table"
+    assert by_name["fct_invoices"].materialized == "table"
+
+
 def test_scan_models_dependencies(project_dir: Path) -> None:
     by_name = {m.name: m for m in scan_models(project_dir)}
     assert by_name["stg_fuel_receipts"].depends_on == ["raw.extractions"]
@@ -62,6 +81,8 @@ def test_scan_models_dependencies(project_dir: Path) -> None:
         "fct_fuel_purchases",
         "fct_maintenance",
     ]
+    assert by_name["stg_consulting__invoices"].depends_on == ["consulting_raw.raw_invoices"]
+    assert by_name["dim_engagements"].depends_on == ["stg_consulting__engagements"]
 
 
 def test_scan_models_paths(project_dir: Path) -> None:

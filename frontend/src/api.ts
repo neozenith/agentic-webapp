@@ -714,8 +714,63 @@ export async function listDashboards(): Promise<DashboardSpec[]> {
   return resp.json();
 }
 
-export async function renderDashboard(id: string): Promise<DashboardRender> {
-  const resp = await apiFetch(`/api/dashboards/${encodeURIComponent(id)}/render`);
+/** Optional timespine overrides for a dashboard render: re-bucket by `grain` and/or
+ * date-filter the whole dashboard to the [start, end] window (ISO dates). */
+export interface RenderParams {
+  grain?: string;
+  start?: string;
+  end?: string;
+}
+
+export async function renderDashboard(id: string, params?: RenderParams): Promise<DashboardRender> {
+  const qs = new URLSearchParams();
+  if (params?.grain) qs.set("grain", params.grain);
+  if (params?.start) qs.set("start", params.start);
+  if (params?.end) qs.set("end", params.end);
+  const query = qs.toString();
+  const resp = await apiFetch(`/api/dashboards/${encodeURIComponent(id)}/render${query ? `?${query}` : ""}`);
   if (!resp.ok) throw new Error(`dashboard render error ${resp.status}`);
+  return resp.json();
+}
+
+// --- dbt observability (/api/dbt/observability): Elementary-backed run history ---
+export interface DbtInvocation {
+  invocation_id: string;
+  command: string;
+  run_started_at: string;
+  run_completed_at: string;
+  target_name: string;
+  dbt_version: string;
+  n_nodes: number;
+  wall_secs: number;
+  has_failures: boolean;
+}
+
+export interface DbtGanttNode {
+  thread_id: string;
+  node_id: string;
+  name: string;
+  resource_type: string;
+  status: string;
+  start_offset_secs: number;
+  duration_secs: number;
+}
+
+export interface DbtGantt {
+  invocation_id: string;
+  wall_secs: number;
+  threads: string[];
+  nodes: DbtGanttNode[];
+}
+
+export async function listDbtInvocations(days = 30): Promise<DbtInvocation[]> {
+  const resp = await apiFetch(`/api/dbt/observability/invocations?days=${days}`);
+  if (!resp.ok) throw new Error(`dbt invocations error ${resp.status}`);
+  return resp.json();
+}
+
+export async function getDbtGantt(id: string): Promise<DbtGantt> {
+  const resp = await apiFetch(`/api/dbt/observability/invocations/${encodeURIComponent(id)}`);
+  if (!resp.ok) throw new Error(`dbt gantt error ${resp.status}`);
   return resp.json();
 }

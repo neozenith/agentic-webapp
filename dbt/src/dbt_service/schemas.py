@@ -53,3 +53,38 @@ class HealthResponse(BaseModel):
     """Liveness probe payload."""
 
     status: str = "ok"
+
+
+class ObservabilityInvocation(BaseModel):
+    """One dbt invocation as surfaced by GET /observability/invocations."""
+
+    invocation_id: str
+    command: str
+    run_started_at: str | None
+    run_completed_at: str | None
+    target_name: str
+    dbt_version: str
+    n_nodes: int
+    wall_secs: float
+    has_failures: bool
+
+
+class GanttNode(BaseModel):
+    """One node (model/test/...) on an invocation's gantt timeline."""
+
+    thread_id: str
+    node_id: str
+    name: str
+    resource_type: str
+    status: str
+    start_offset_secs: float
+    duration_secs: float
+
+
+class GanttResponse(BaseModel):
+    """Per-invocation gantt: thread lanes plus offset-positioned nodes."""
+
+    invocation_id: str
+    wall_secs: float
+    threads: list[str]
+    nodes: list[GanttNode]

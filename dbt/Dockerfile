@@ -25,8 +25,14 @@ RUN uv sync --frozen --no-dev
 
 # The dbt project itself lives at /app (DBT_PROJECT_DIR): dbt_project.yml +
 # profiles.yml + models. The sidecar passes --project-dir/--profiles-dir /app.
-COPY dbt/dbt_project.yml dbt/profiles.yml ./
+COPY dbt/dbt_project.yml dbt/profiles.yml dbt/packages.yml dbt/package-lock.yml ./
+COPY dbt/macros ./macros
 COPY dbt/models ./models
+
+# Vendor the dbt packages (Elementary + its deps) into the image's dbt_packages
+# at build time, so the runtime has no network dependency on dbt hub. Uses the
+# committed package-lock.yml for reproducibility. dbt deps needs no warehouse.
+RUN dbt deps
 
 EXPOSE 8082
 CMD ["sh", "-c", ".venv/bin/uvicorn dbt_service.app:app --host 0.0.0.0 --port ${PORT:-8082}"]

@@ -5,8 +5,17 @@ from functools import lru_cache
 from fastapi import Depends, FastAPI
 
 from .config import Settings
+from .observability import ObservabilityService
 from .runner import DbtRunner
-from .schemas import DbtModelInfo, DbtProjectInfo, DbtRunResult, HealthResponse, RunRequest
+from .schemas import (
+    DbtModelInfo,
+    DbtProjectInfo,
+    DbtRunResult,
+    GanttResponse,
+    HealthResponse,
+    ObservabilityInvocation,
+    RunRequest,
+)
 
 
 @lru_cache
@@ -18,6 +27,11 @@ def get_settings() -> Settings:
 def get_runner(settings: Settings = Depends(get_settings)) -> DbtRunner:
     """A DbtRunner bound to the configured project directory."""
     return DbtRunner(settings)
+
+
+def get_observability(settings: Settings = Depends(get_settings)) -> ObservabilityService:
+    """An ObservabilityService bound to the configured BigQuery coordinates."""
+    return ObservabilityService(settings)
 
 
 def create_app() -> FastAPI:
@@ -51,6 +65,18 @@ def create_app() -> FastAPI:
     @app.post("/compile", response_model=DbtRunResult)
     def compile_(body: RunRequest, runner: DbtRunner = Depends(get_runner)) -> DbtRunResult:
         return runner.run("compile", body.select)
+
+    @app.get("/observability/invocations", response_model=list[ObservabilityInvocation])
+    def observability_invocations(
+        days: int = 30, obs: ObservabilityService = Depends(get_observability)
+    ) -> list[dict[str, object]]:
+        return obs.invocations(days)
+
+    @app.get("/observability/invocations/{invocation_id}", response_model=GanttResponse)
+    def observability_gantt(
+        invocation_id: str, obs: ObservabilityService = Depends(get_observability)
+    ) -> dict[str, object]:
+        return obs.gantt(invocation_id)
 
     return app
 

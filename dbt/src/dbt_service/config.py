@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Default to the dbt project root: this file is src/dbt_service/config.py, so
@@ -18,3 +19,18 @@ class Settings(BaseSettings):
     dbt_project_dir: Path = _DEFAULT_PROJECT_DIR
     dbt_target: str = "dev"
     port: int = 8082
+
+    # BigQuery coordinates for the observability endpoints. gcp_project mirrors
+    # GCP_PROJECT; bigquery_dataset mirrors BIGQUERY_DATASET (same defaults as the
+    # dbt profile). elementary_dataset defaults to <bigquery_dataset>_elementary —
+    # the dataset Elementary writes its artifact tables into.
+    gcp_project: str = ""
+    bigquery_dataset: str = "agentic_webapp"
+    elementary_dataset: str = ""
+
+    @model_validator(mode="after")
+    def _default_elementary_dataset(self) -> "Settings":
+        """Derive elementary_dataset from bigquery_dataset unless set explicitly."""
+        if not self.elementary_dataset:
+            self.elementary_dataset = f"{self.bigquery_dataset}_elementary"
+        return self

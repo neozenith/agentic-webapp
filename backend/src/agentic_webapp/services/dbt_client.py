@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from agentic_core.models import DbtModelInfo, DbtRunResult
+from agentic_core.models import DbtGantt, DbtInvocation, DbtModelInfo, DbtRunResult
 
 _REF = re.compile(r"""ref\(\s*['"]([\w.]+)['"]""")
 _SOURCE = re.compile(r"""source\(\s*['"]([\w.]+)['"]\s*,\s*['"]([\w.]+)['"]""")
@@ -54,6 +54,14 @@ class DbtClient(ABC):
 
     @abstractmethod
     async def compile(self, *, select: str | None = None) -> DbtRunResult: ...
+
+    @abstractmethod
+    async def invocations(self, *, days: int = 30) -> list[DbtInvocation]:
+        """Recent dbt runs from Elementary metadata (the observability overview)."""
+
+    @abstractmethod
+    async def gantt(self, invocation_id: str) -> DbtGantt:
+        """One run's per-node execution timeline from Elementary `dbt_run_results`."""
 
 
 class FilesystemDbtClient(DbtClient):
@@ -116,6 +124,14 @@ class FilesystemDbtClient(DbtClient):
 
     async def compile(self, *, select: str | None = None) -> DbtRunResult:
         return await self._dbt("compile", select)
+
+    async def invocations(self, *, days: int = 30) -> list[DbtInvocation]:
+        # Elementary metadata lives in the warehouse, populated by on-run-end in the cloud
+        # sidecar — there is none to read from the local filesystem. Honest empty, not a fake.
+        return []
+
+    async def gantt(self, invocation_id: str) -> DbtGantt:
+        return DbtGantt(invocation_id=invocation_id)
 
     async def _dbt(self, command: str, select: str | None) -> DbtRunResult:
         if shutil.which("dbt") is None:
@@ -194,6 +210,18 @@ class HttpDbtClient(DbtClient):
 
     async def compile(self, *, select: str | None = None) -> DbtRunResult:
         return await self._post("compile", select)
+
+    async def invocations(self, *, days: int = 30) -> list[DbtInvocation]:
+        async with httpx.AsyncClient(base_url=self._base, timeout=30.0) as client:
+            resp = await client.get("/observability/invocations", params={"days": days})
+            resp.raise_for_status()
+            return [DbtInvocation.model_validate(i) for i in resp.json()]
+
+    async def gantt(self, invocation_id: str) -> DbtGantt:
+        async with httpx.AsyncClient(base_url=self._base, timeout=30.0) as client:
+            resp = await client.get(f"/observability/invocations/{invocation_id}")
+            resp.raise_for_status()
+            return DbtGantt.model_validate(resp.json())
 
     async def _post(self, command: str, select: str | None) -> DbtRunResult:
         async with httpx.AsyncClient(base_url=self._base, timeout=self._timeout) as client:

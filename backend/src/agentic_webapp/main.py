@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
-from agentic_core.database import GroupManager, seed_fuel_domain
+from agentic_core.database import GroupManager, seed_consulting_domain, seed_fuel_domain
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRoute
@@ -60,11 +60,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # dashboards and MCP surfaces have data out of the box. No-op on a SQL backend (BigQuery),
     # where dbt + Terraform own the tables, and idempotent on re-runs.
     if settings.seed_demo_domain:
-        await seed_fuel_domain(
-            db=get_analytics_database(),
-            semantic_table=settings.semantic_models_table,
-            dashboard_table=settings.dashboards_table,
-        )
+        seed_db = get_analytics_database()
+        sem_table, dash_table = settings.semantic_models_table, settings.dashboards_table
+        await seed_fuel_domain(db=seed_db, semantic_table=sem_table, dashboard_table=dash_table)
+        await seed_consulting_domain(db=seed_db, semantic_table=sem_table, dashboard_table=dash_table)
     # FastMCP's streamable-HTTP transport only starts inside its own app's lifespan; nest it
     # here (the MCP app is built in create_app and stashed on app.state, so it exists by now).
     mcp_app = getattr(app.state, "mcp_app", None)

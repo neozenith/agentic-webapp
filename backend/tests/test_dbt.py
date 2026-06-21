@@ -79,3 +79,19 @@ def test_viewer_is_forbidden(app) -> None:
     c = TestClient(app)
     c.headers.update({"X-Goog-Authenticated-User-Email": VIEWER})
     assert c.get("/api/dbt/models").status_code == 403
+
+
+def test_observability_empty_without_elementary(admin: TestClient) -> None:
+    """The FilesystemDbtClient has no Elementary metadata — honest empty, not an error."""
+    invs = admin.get("/api/dbt/observability/invocations")
+    assert invs.status_code == 200
+    assert invs.json() == []
+    gantt = admin.get("/api/dbt/observability/invocations/anything").json()
+    assert gantt["invocation_id"] == "anything"
+    assert gantt["nodes"] == [] and gantt["threads"] == []
+
+
+def test_observability_forbidden_for_viewer(app) -> None:
+    c = TestClient(app)
+    c.headers.update({"X-Goog-Authenticated-User-Email": VIEWER})
+    assert c.get("/api/dbt/observability/invocations").status_code == 403

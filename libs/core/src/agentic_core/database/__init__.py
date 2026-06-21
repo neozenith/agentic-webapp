@@ -18,6 +18,12 @@ from .seed import (
     fuel_semantic_model,
     seed_fuel_domain,
 )
+from .seed_consulting import (
+    CONSULTING_MODEL_ID,
+    consulting_dashboards,
+    consulting_semantic_model,
+    seed_consulting_domain,
+)
 from .semantic import SemanticManager, SemanticModelNotFoundError, SemanticQueryError
 
 __all__ = [
@@ -39,6 +45,10 @@ __all__ = [
     "fuel_semantic_model",
     "fuel_dashboards",
     "seed_fuel_domain",
+    "CONSULTING_MODEL_ID",
+    "consulting_semantic_model",
+    "consulting_dashboards",
+    "seed_consulting_domain",
     "build_database_from_env",
     "build_analytics_database_from_env",
 ]
