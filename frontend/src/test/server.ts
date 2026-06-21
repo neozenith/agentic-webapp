@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-const ALL_AREAS = ["home", "chat", "sessions", "assets", "analytics", "admin"];
+const ALL_AREAS = ["home", "chat", "sessions", "assets", "analytics", "semantic", "dbt", "dashboards", "admin"];
 
 // A shared MSW server — a real network-level fake (not an object mock). Tests register
 // per-case handlers via `server.use(...)`, which override the defaults below.

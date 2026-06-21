@@ -112,7 +112,52 @@ resource "google_bigquery_table" "extractions" {
   ])
 }
 
-# Runtime SA can read/write rows in this dataset...
+# App-managed semantic-layer store: one row per semantic model the webapp defines
+# (entities/metrics the dbt MARTS are described against). definition_json carries a JSON
+# array of entities so the shape can evolve without a schema change.
+resource "google_bigquery_table" "semantic_models" {
+  dataset_id          = google_bigquery_dataset.app.dataset_id
+  table_id            = "semantic_models"
+  deletion_protection = var.environment == "prod"
+
+  schema = jsonencode([
+    { name = "model_id", type = "STRING", mode = "REQUIRED" },
+    { name = "name", type = "STRING", mode = "NULLABLE" },
+    { name = "description", type = "STRING", mode = "NULLABLE" },
+    { name = "definition_json", type = "STRING", mode = "NULLABLE" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "updated_at", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
+# App-managed dashboard store: one row per dashboard the webapp defines. charts_json is a
+# JSON array of chart specs; semantic_model_id (nullable) links a dashboard to the
+# semantic model it reads. These plus semantic_models are the app's semantic-layer +
+# dashboard stores.
+#
+# NOTE: the dbt MARTS (fct_fuel_purchases, fct_maintenance, agg_vehicle_costs_yearly) are
+# deliberately NOT declared here — dbt creates them at runtime via the sidecar container
+# (see cloudrun.tf). The runtime SA's dataset-scoped dataEditor + project-scoped jobUser
+# grants below already cover any table dbt materialises in this dataset, including these.
+resource "google_bigquery_table" "dashboards" {
+  dataset_id          = google_bigquery_dataset.app.dataset_id
+  table_id            = "dashboards"
+  deletion_protection = var.environment == "prod"
+
+  schema = jsonencode([
+    { name = "dashboard_id", type = "STRING", mode = "REQUIRED" },
+    { name = "name", type = "STRING", mode = "NULLABLE" },
+    { name = "description", type = "STRING", mode = "NULLABLE" },
+    { name = "semantic_model_id", type = "STRING", mode = "NULLABLE" },
+    { name = "charts_json", type = "STRING", mode = "NULLABLE" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "updated_at", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
+# Runtime SA can read/write rows in this dataset (dataset-scoped: covers the two new
+# app-managed tables above AND any MART the dbt sidecar materialises at runtime — no
+# per-table IAM is needed)...
 resource "google_bigquery_dataset_iam_member" "runtime_data_editor" {
   dataset_id = google_bigquery_dataset.app.dataset_id
   role       = "roles/bigquery.dataEditor"

@@ -45,10 +45,33 @@ services:
       GCP_PROJECT: dbt-dev-jaffleshop
       ASSETS_BUCKET: dbt-dev-jaffleshop-agentic-webapp-assets
       FIRESTORE_DATABASE: agentic-webapp
-      # Reach the agent sidecar by compose service name.
+      # Analytics + semantic layer + dashboards share the BigQuery analytics axis.
+      BIGQUERY_DATASET: agentic_webapp
+      # Reach the agent + dbt sidecars by compose service name.
       AGENT_BASE_URL: http://agent:8081
+      DBT_BASE_URL: http://dbt:8082
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/adc.json
     volumes:
       - ${HOME}/.config/gcloud/application_default_credentials.json:/gcp/adc.json:ro
     depends_on:
       - agent
+      - dbt
+
+  # dbt-core sidecar: a FastAPI service wrapping the dbt CLI against the dev BigQuery
+  # dataset. The backend proxies /api/dbt/* here; `dbt run` materialises the marts that
+  # the semantic layer + dashboards read.
+  dbt:
+    build:
+      context: .
+      dockerfile: dbt/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      GCP_PROJECT: dbt-dev-jaffleshop
+      BIGQUERY_DATASET: agentic_webapp
+      BIGQUERY_LOCATION: australia-southeast1
+      DBT_TARGET: dev
+      DBT_PROJECT_DIR: /app
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/adc.json
+    volumes:
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/gcp/adc.json:ro

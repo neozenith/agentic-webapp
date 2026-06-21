@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
-from agentic_core.database import GroupManager
+from agentic_core.database import GroupManager, seed_fuel_domain
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRoute
@@ -17,8 +17,20 @@ from fastapi.utils import generate_unique_id as _default_unique_id
 
 from . import rbac
 from .api.auth import iap_email, require_area
-from .api.deps import get_group_manager
-from .api.routes import admin, agent, analytics, assets, extractions, folders, health, ui
+from .api.deps import get_analytics_database, get_group_manager
+from .api.routes import (
+    admin,
+    agent,
+    analytics,
+    assets,
+    dashboards,
+    dbt,
+    extractions,
+    folders,
+    health,
+    semantic,
+    ui,
+)
 from .config import Settings, get_settings
 from .identity import mask_user_id
 from .logging_setup import configure_logging
@@ -44,6 +56,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     settings.temp_dir.mkdir(parents=True, exist_ok=True)
+    # Seed the worked fuel-tracking demo into the in-memory analytics store so the semantic,
+    # dashboards and MCP surfaces have data out of the box. No-op on a SQL backend (BigQuery),
+    # where dbt + Terraform own the tables, and idempotent on re-runs.
+    if settings.seed_demo_domain:
+        await seed_fuel_domain(
+            db=get_analytics_database(),
+            semantic_table=settings.semantic_models_table,
+            dashboard_table=settings.dashboards_table,
+        )
     # FastMCP's streamable-HTTP transport only starts inside its own app's lifespan; nest it
     # here (the MCP app is built in create_app and stashed on app.state, so it exists by now).
     mcp_app = getattr(app.state, "mcp_app", None)
@@ -74,6 +95,11 @@ def create_app() -> FastAPI:
     # Sensitive areas are enforced server-side (defense-in-depth behind the SPA gating).
     app.include_router(admin.router, dependencies=[Depends(require_area("admin"))])
     app.include_router(analytics.router, dependencies=[Depends(require_area("analytics"))])
+    # Top-down data-modelling surfaces (semantic layer, dbt project, dashboards). semantic +
+    # dbt are authoring/management (analyst+admin); dashboards is read-broad (see rbac.py).
+    app.include_router(semantic.router, dependencies=[Depends(require_area("semantic"))])
+    app.include_router(dbt.router, dependencies=[Depends(require_area("dbt"))])
+    app.include_router(dashboards.router, dependencies=[Depends(require_area("dashboards"))])
     # Scoped proxy to the agent sidecar (ADK run endpoints + /dev-ui), registered
     # before the SPA so those paths reach the agent, not the SPA fallback.
     app.include_router(agent.build_router())

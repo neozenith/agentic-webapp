@@ -4,8 +4,8 @@ SHELL         := /usr/bin/env bash
 .SHELLFLAGS   := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 
-# Order: libs/core first (backend + agent depend on it), then the apps, the CLI, then infra.
-SUBPROJECTS := libs/core backend agent cli frontend infra
+# Order: libs/core first (backend + agent depend on it), then the apps + sidecars, the CLI, then infra.
+SUBPROJECTS := libs/core backend agent dbt cli frontend infra
 
 .PHONY: help install dev dev-docker clean-ports fix ci openapi mcp-cli mcp-agent mcp-claude mcp-codex $(addprefix ci-,$(SUBPROJECTS)) $(addprefix fix-,$(SUBPROJECTS))
 

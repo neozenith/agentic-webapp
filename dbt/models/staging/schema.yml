@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: stg_fuel_receipts
+    description: >
+      Fuel-receipt extractions (doc_type='fuel_receipt') with the JSON payload
+      unpacked into typed columns. Expected `fields_json` keys: purchased_at
+      (date), station, fuel_type, litres, price_per_litre, total_cost,
+      odometer_km, vehicle.
+    columns:
+      - name: purchase_id
+        description: "Primary key; equals extractions.extraction_id."
+        tests:
+          - not_null
+          - unique
+      - name: purchased_at
+        description: "Purchase date (DATE), parsed from fields_json.purchased_at."
+      - name: vehicle
+        description: "Vehicle the fuel was bought for."
+      - name: station
+        description: "Fuel station / vendor name."
+      - name: fuel_type
+        description: "Fuel grade, e.g. 'U91', 'diesel'."
+      - name: litres
+        description: "Volume purchased in litres (FLOAT64)."
+      - name: price_per_litre
+        description: "Unit price per litre (FLOAT64)."
+      - name: total_cost
+        description: "Total amount paid (FLOAT64)."
+      - name: odometer_km
+        description: "Odometer reading at fill-up in kilometres (INT64)."
+
+  - name: stg_maintenance
+    description: >
+      Maintenance extractions (doc_type='maintenance') with the JSON payload
+      unpacked into typed columns. Expected `fields_json` keys: serviced_at
+      (date), category, vendor, total_cost, vehicle.
+    columns:
+      - name: maintenance_id
+        description: "Primary key; equals extractions.extraction_id."
+        tests:
+          - not_null
+          - unique
+      - name: serviced_at
+        description: "Service date (DATE), parsed from fields_json.serviced_at."
+      - name: vehicle
+        description: "Vehicle that was serviced."
+      - name: category
+        description: "Maintenance category, e.g. 'tyres', 'oil_change'."
+      - name: vendor
+        description: "Workshop / service provider name."
+      - name: total_cost
+        description: "Total amount paid for the service (FLOAT64)."

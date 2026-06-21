@@ -21,6 +21,18 @@ class DatabaseManager(ABC):
     """Async access to tables of rows. Table names are logical (the implementation
     maps them onto a dataset/schema)."""
 
+    # Whether query() accepts raw SQL. Backends that can push aggregation down to the
+    # warehouse set this True; portable managers (e.g. SemanticManager) branch on it to
+    # decide between an SQL push-down and an in-process aggregation over list(). This is a
+    # capability axis, NOT a fallback — both paths satisfy the same contract.
+    supports_sql: bool = False
+
+    def qualified_table(self, table: str) -> str:
+        """How `table` is referenced inside a raw SQL string for this backend. Backends
+        that map logical names onto a dataset/schema override this (e.g. BigQuery returns
+        a back-ticked `project.dataset.table`)."""
+        return table
+
     @abstractmethod
     async def insert(self, table: str, rows: Rows) -> None:
         """Append rows to a table."""

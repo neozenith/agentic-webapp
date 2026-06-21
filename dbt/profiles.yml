@@ -1,0 +1,35 @@
+# BigQuery profile for the agentic_webapp dbt project.
+#
+# Auth is `oauth`, i.e. Application Default Credentials: locally this is your
+# `gcloud auth application-default login`; on Cloud Run it is the runtime
+# service account. No key files.
+#
+# All three targets read the SAME env vars — they differ only by name. Pick one
+# with DBT_TARGET (dev|test|prod); the sidecar passes --target $DBT_TARGET.
+agentic_webapp_dbt:
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT') }}"
+      dataset: "{{ env_var('BIGQUERY_DATASET', 'agentic_webapp') }}"
+      location: "{{ env_var('BIGQUERY_LOCATION', 'australia-southeast1') }}"
+      threads: 4
+      priority: interactive
+    test:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT') }}"
+      dataset: "{{ env_var('BIGQUERY_DATASET', 'agentic_webapp') }}"
+      location: "{{ env_var('BIGQUERY_LOCATION', 'australia-southeast1') }}"
+      threads: 4
+      priority: interactive
+    prod:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT') }}"
+      dataset: "{{ env_var('BIGQUERY_DATASET', 'agentic_webapp') }}"
+      location: "{{ env_var('BIGQUERY_LOCATION', 'australia-southeast1') }}"
+      threads: 4
+      priority: interactive

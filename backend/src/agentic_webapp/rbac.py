@@ -20,13 +20,18 @@ from typing import Any
 from .identity import mask_user_id
 
 # Gateable areas — keep in sync with the SPA routes/nav.
-AREAS: tuple[str, ...] = ("home", "chat", "sessions", "assets", "analytics", "admin")
+# semantic/dbt/dashboards are the top-down data-modelling surfaces: an analyst designs the
+# logical model (semantic), the dbt project implements it physically (dbt), and dashboards
+# read it back (dashboards). They sit alongside `analytics` and share the analyst grant.
+AREAS: tuple[str, ...] = (
+    "home", "chat", "sessions", "assets", "analytics", "semantic", "dbt", "dashboards", "admin"
+)
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "admin": set(AREAS),  # everything, incl. the Admin panel
-    "analyst": {"home", "chat", "sessions", "assets", "analytics"},
-    "operator": {"home", "chat", "sessions", "assets"},
-    "viewer": {"home", "chat", "sessions"},
+    "analyst": {"home", "chat", "sessions", "assets", "analytics", "semantic", "dbt", "dashboards"},
+    "operator": {"home", "chat", "sessions", "assets", "dashboards"},
+    "viewer": {"home", "chat", "sessions", "dashboards"},
 }
 
 # Role given to a signed-in user with no explicit mapping.

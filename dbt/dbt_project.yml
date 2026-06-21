@@ -1,0 +1,23 @@
+name: 'agentic_webapp_dbt'
+version: '1.0.0'
+config-version: 2
+
+# Profile lives in this same directory (profiles.yml); the sidecar passes
+# --profiles-dir <DBT_PROJECT_DIR>, so dbt resolves it without ~/.dbt.
+profile: 'agentic_webapp_dbt'
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Materializations only. No per-model +schema override, so every model lands in
+# the dataset configured by the active profile target (BIGQUERY_DATASET, default
+# agentic_webapp) — staging as views, marts as tables.
+models:
+  agentic_webapp_dbt:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

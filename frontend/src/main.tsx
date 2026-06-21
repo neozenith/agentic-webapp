@@ -13,7 +13,11 @@ import { AdminUser } from "./pages/AdminUser";
 import { Analytics } from "./pages/Analytics";
 import { Assets } from "./pages/Assets";
 import { Chat } from "./pages/Chat";
+import { Dashboards } from "./pages/Dashboards";
+import { DashboardView } from "./pages/DashboardView";
+import { Dbt } from "./pages/Dbt";
 import { Home } from "./pages/Home";
+import { Semantic } from "./pages/Semantic";
 import { Sessions } from "./pages/Sessions";
 import "./index.css";
 
@@ -39,6 +43,38 @@ createRoot(rootElement).render(
                   element={
                     <RequireArea area="analytics">
                       <Analytics />
+                    </RequireArea>
+                  }
+                />
+                <Route
+                  path="/semantic"
+                  element={
+                    <RequireArea area="semantic">
+                      <Semantic />
+                    </RequireArea>
+                  }
+                />
+                <Route
+                  path="/dbt"
+                  element={
+                    <RequireArea area="dbt">
+                      <Dbt />
+                    </RequireArea>
+                  }
+                />
+                <Route
+                  path="/dashboards"
+                  element={
+                    <RequireArea area="dashboards">
+                      <Dashboards />
+                    </RequireArea>
+                  }
+                />
+                <Route
+                  path="/dashboards/:dashboardId"
+                  element={
+                    <RequireArea area="dashboards">
+                      <DashboardView />
                     </RequireArea>
                   }
                 />

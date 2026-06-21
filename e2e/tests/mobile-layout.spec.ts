@@ -25,6 +25,9 @@ const ROUTES = [
   { path: "/chat", name: "chat" },
   { path: "/assets", name: "assets" },
   { path: "/admin", name: "admin" },
+  { path: "/semantic", name: "semantic" },
+  { path: "/dbt", name: "dbt" },
+  { path: "/dashboards", name: "dashboards" },
 ] as const;
 
 // Sub-pixel rounding (DPR 2) can leave a fractional px; allow a tiny slack so we

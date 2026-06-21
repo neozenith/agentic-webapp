@@ -37,6 +37,17 @@ variable "agent_image" {
   default     = ""
 }
 
+variable "dbt_image" {
+  description = <<-EOT
+    OPTIONAL pin for the dbt-core sidecar image. Default "" ⇒ the stack builds the dbt
+    image in-DAG (build.tf terraform_data.dbt_image) and Cloud Run runs the resulting
+    source-hash tag (local.dbt_image). Set a fully-qualified image ref to pin/rollback
+    to a specific tag instead (which also skips the dbt build).
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "agent_model" {
   description = "Gemini model the agent uses by default (cheapest by default)."
   type        = string

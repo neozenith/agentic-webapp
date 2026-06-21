@@ -26,7 +26,14 @@ from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools import ToolResult
 
 from .api.auth import IAP_USER_HEADER, INTERNAL_VIEWER_HEADER
-from .mcp_ui import browse_summary, fetch_visible, render_browse
+from .mcp_ui import (
+    browse_summary,
+    dashboard_summary,
+    fetch_dashboard_render,
+    fetch_visible,
+    render_browse,
+    render_dashboard_ui,
+)
 
 # Identity headers forwarded from the MCP client to the core API. Lower-cased because
 # get_http_headers() returns lower-cased keys; httpx header keys are case-insensitive.
@@ -66,6 +73,17 @@ def _register_ui_tools(server: FastMCP[Any], client: httpx.AsyncClient) -> None:
         folders, assets = await fetch_visible(client)
         summary = browse_summary(folders, assets, folder_id)
         ui = render_browse(folders, assets, folder_id=folder_id)
+        return ToolResult(content=[mcp_types.TextContent(type="text", text=summary), ui])
+
+    @server.tool
+    async def dashboard(dashboard_id: str) -> ToolResult:
+        """Render a saved analytics dashboard inline as an interactive panel (Plotly charts +
+        KPI cards over the semantic data model). Returns a short text summary for the model plus
+        an embedded io.modelcontextprotocol/ui resource for the host to render. Get a
+        dashboard_id from the `dashboards_list` tool (e.g. "fuel-overview", "fuel-tco")."""
+        render = await fetch_dashboard_render(client, dashboard_id)
+        summary = dashboard_summary(render)
+        ui = render_dashboard_ui(render)
         return ToolResult(content=[mcp_types.TextContent(type="text", text=summary), ui])
 
 

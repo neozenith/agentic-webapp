@@ -1,8 +1,11 @@
 import {
   BarChart3,
+  Boxes,
+  Database,
   FolderTree,
   History,
   House,
+  LayoutDashboard,
   LineChart,
   type LucideIcon,
   MessagesSquare,
@@ -32,6 +35,9 @@ const NAV: NavItem[] = [
   { to: "/sessions", label: "Sessions", icon: History, area: "sessions" },
   { to: "/assets", label: "Assets", icon: FolderTree, area: "assets" },
   { to: "/analytics", label: "Analytics", icon: LineChart, area: "analytics" },
+  { to: "/semantic", label: "Semantic", icon: Boxes, area: "semantic" },
+  { to: "/dbt", label: "dbt", icon: Database, area: "dbt" },
+  { to: "/dashboards", label: "Dashboards", icon: LayoutDashboard, area: "dashboards" },
   { to: "/admin", label: "Admin", icon: BarChart3, area: "admin" },
 ];
 

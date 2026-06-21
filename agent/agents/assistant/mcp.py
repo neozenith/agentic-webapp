@@ -23,11 +23,23 @@ from .assets_client import BACKEND_BASE_URL
 INTERNAL_VIEWER_HEADER = "X-Viewer-User-Id"
 MCP_URL = f"{BACKEND_BASE_URL.rstrip('/')}/mcp/"
 
-# Least privilege: the chat agent surfaces only the kernel tools it needs. Admin/analytics
-# tools exist on the MCP but aren't exposed here (and RBAC would 403 them for a chat user).
-# `browse` returns an interactive MCP-UI panel (folders/assets) the web chat renders inline
-# (ADR-0012); its result carries a small text summary for the model plus a ui:// resource.
-_TOOL_FILTER = ["assets_list", "assets_get", "extractions_record", "browse"]
+# Least privilege: the chat agent surfaces only the kernel tools it needs. Admin tools exist
+# on the MCP but aren't exposed here (and RBAC would 403 them for a chat user).
+# `browse` and `dashboard` return interactive MCP-UI panels the web chat renders inline
+# (ADR-0012); their result carries a small text summary for the model plus a ui:// resource.
+# The semantic_* tools let the agent answer data questions over the logical model (it lists
+# models, then runs a SemanticQuery); `dashboards_list` finds dashboards to render inline.
+_TOOL_FILTER = [
+    "assets_list",
+    "assets_get",
+    "extractions_record",
+    "browse",
+    "semantic_list_models",
+    "semantic_get_model",
+    "semantic_query",
+    "dashboards_list",
+    "dashboard",
+]
 
 
 def identity_headers(ctx: ReadonlyContext) -> dict[str, str]:

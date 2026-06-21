@@ -23,6 +23,8 @@ from .base import DatabaseManager, Row, Rows
 class BigQueryDatabaseManager(
     DatabaseManager
 ):  # pragma: no cover — real BigQuery SDK; un-mockable per no-mock rule (covered by live deploy)
+    supports_sql = True
+
     def __init__(
         self,
         *,
@@ -36,6 +38,9 @@ class BigQueryDatabaseManager(
 
     def _table_id(self, table: str) -> str:
         return f"{self._project}.{self._dataset}.{table}"
+
+    def qualified_table(self, table: str) -> str:
+        return f"`{self._table_id(table)}`"
 
     async def insert(self, table: str, rows: Rows) -> None:
         def _insert() -> None:

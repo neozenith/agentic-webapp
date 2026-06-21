@@ -1,0 +1,10 @@
+# Build the dbt sidecar image from the REPO ROOT context (consistent with
+# backend/agent). Invoked like:
+#   gcloud builds submit . --config dbt/cloudbuild.yaml --substitutions=_IMAGE=<ref>
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "dbt/Dockerfile", "-t", "${_IMAGE}", "."]
+images:
+  - "${_IMAGE}"
+options:
+  logging: CLOUD_LOGGING_ONLY

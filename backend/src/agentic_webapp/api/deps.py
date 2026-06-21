@@ -15,14 +15,16 @@ from agentic_core.database import (
     AnalyticsManager,
     AssetMetadataManager,
     BigQueryDatabaseManager,
+    DashboardManager,
     DatabaseManager,
     FirestoreDatabaseManager,
     FolderManager,
     GroupManager,
     InMemoryDatabaseManager,
     LlmUsageManager,
+    SemanticManager,
 )
-from ..services import AssetService
+from ..services import AssetService, DbtClient, FilesystemDbtClient, HttpDbtClient
 from agentic_core.storage import GCSStorageManager, InMemoryStorageManager, StorageManager
 
 
@@ -79,16 +81,46 @@ def get_llm_usage_manager() -> LlmUsageManager:
 
 
 @lru_cache
-def get_analytics_manager() -> AnalyticsManager:
-    """The analytics warehouse (AnalyticsManager) — BigQuery when a project+dataset are
-    configured, else in-memory. Deliberately separate from get_database() (the operational
-    Firestore store): analytics is its own backend axis (see AnalyticsManager)."""
+def get_analytics_database() -> DatabaseManager:
+    """The shared ANALYTICS warehouse handle — BigQuery when a project+dataset are configured,
+    else ONE in-memory store. Distinct from get_database() (operational Firestore): analytics is
+    its own backend axis. Returned as a singleton so the analytics, semantic, dashboard managers
+    (and the local demo seed) all read/write the SAME tables — without this, each manager would
+    build its own empty in-memory DB and a seeded fact table would be invisible to a query."""
     s = get_settings()
     if s.gcp_project and s.bigquery_dataset:
-        return AnalyticsManager(  # pragma: no cover — real BQ client; covered by live deploy
-            BigQueryDatabaseManager(project=s.gcp_project, dataset=s.bigquery_dataset)
+        return BigQueryDatabaseManager(  # pragma: no cover — real BQ client; covered by live deploy
+            project=s.gcp_project, dataset=s.bigquery_dataset
         )
-    return AnalyticsManager(InMemoryDatabaseManager())
+    return InMemoryDatabaseManager()
+
+
+@lru_cache
+def get_analytics_manager() -> AnalyticsManager:
+    """The analytics warehouse (AnalyticsManager), over the shared analytics DB axis."""
+    return AnalyticsManager(get_analytics_database())
+
+
+@lru_cache
+def get_semantic_manager() -> SemanticManager:
+    """The semantic layer (logical data model) over the shared analytics DB axis."""
+    return SemanticManager(get_analytics_database(), table=get_settings().semantic_models_table)
+
+
+@lru_cache
+def get_dashboard_manager() -> DashboardManager:
+    """The dashboard specs (AnalyticsManager data→pixels) over the shared analytics DB axis."""
+    return DashboardManager(get_analytics_database(), table=get_settings().dashboards_table)
+
+
+@lru_cache
+def get_dbt_client() -> DbtClient:
+    """The dbt-core project window — the HTTP sidecar when DBT_BASE_URL is set (cloud/compose),
+    else the on-disk filesystem client (local: lists models offline, runs dbt if the CLI exists)."""
+    s = get_settings()
+    if s.dbt_base_url:
+        return HttpDbtClient(s.dbt_base_url)  # pragma: no cover — real sidecar; covered by live deploy
+    return FilesystemDbtClient(s.dbt_project_dir, target=s.environment)
 
 
 @lru_cache

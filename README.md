@@ -291,6 +291,28 @@ dataset, runtime SA, and tfstate bucket are per-project.
 
 </details>
 
+## Top-down data modelling
+
+The scaffold turns a plain-English domain into queryable, charted insight — and is built to be
+**re-pointed at your own domain**. Four layers, each a guard-railed seam (full guide:
+[`.claude/rules/data_modelling.md`](.claude/rules/data_modelling.md);
+rationale: [ADR-0013](docs/adr/adr-0013-semantic-layer-dbt-dashboards.md)):
+
+1. **Semantic layer** (`SemanticManager`, Semantic page) — the logical model: entities →
+   dimensions (slices) + measures (aggregations). A `SemanticQuery` is backend-agnostic; it
+   compiles to BigQuery SQL *and* runs in-process locally, returning rows + the compiled SQL.
+2. **dbt-core sidecar** (`dbt/`, dbt page) — the physical models. A real dbt project
+   (staging → marts) wrapped by a FastAPI service the backend proxies; `dbt run` materialises
+   the marts. The mart column names are the contract the semantic model binds to.
+3. **Dashboards** (`DashboardManager`, Dashboards pages) — each chart binds a `SemanticQuery`
+   to a Plotly figure (the Data→Pixels `encoding`). The same `/render` figures drive the web
+   dashboard suite and the inline-in-chat MCP-UI `dashboard` tool.
+4. **MCP** — every `/api/*` route auto-projects as a tool, so any agent answers questions over
+   the model via `semantic_query` with the same RBAC as the UI.
+
+The shipped worked example (fuel receipts + maintenance → yearly cost) is a deletable seed.
+Replace it with your domain following the recipe in the data-modelling rule.
+
 ## Interfaces to the core API
 
 The FastAPI `/api/*` surface is the single source of functionality and the single place RBAC
@@ -360,8 +382,9 @@ OpenAPI→MCP bridge can't carry image bytes ([ADR-0011](docs/adr/adr-0011-core-
 | [`frontend/`](frontend) | React + Vite SPA (Home / Chat / Admin), built into the backend image |
 | [`backend/`](backend) | FastAPI app: serves the SPA, proxies the agent, exposes `/api/*` + an MCP server at `/mcp`, owns GCS + Firestore/BigQuery |
 | [`agent/`](agent) | Google ADK agent sidecar — its business-logic tools ARE the kernel's MCP (`mcp.py`), so the sidecar stays thin; meters token usage via `after_model_callback`. `agent/harness/` drives the MCP from a standalone ADK agent |
+| [`dbt/`](dbt) | dbt-core project (BigQuery) + a FastAPI sidecar wrapping the dbt CLI; the backend proxies `/api/dbt/*` to it. Materialises the marts the semantic layer + dashboards read |
 | [`cli/`](cli) | Thin Python CLI that drives `/api/*` as a chosen persona (`--as`) — RBAC simulation from the terminal |
-| [`libs/core`](libs/core) | Shared models, storage / database interfaces, LLM pricing |
+| [`libs/core`](libs/core) | Shared models, storage / database interfaces, the semantic layer + dashboards managers, LLM pricing |
 | [`infra/`](infra) | Terraform stacks, bootstrap (WIF), and the `tfs` deploy CLI |
 | [`e2e/`](e2e) | Playwright evidence suite (chat + cost accounting) |
 | [`docs/adr/`](docs/adr) | Architecture decision records |
