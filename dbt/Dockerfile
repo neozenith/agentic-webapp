@@ -8,7 +8,11 @@ ENV PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     DBT_PROJECT_DIR=/app \
-    DBT_TARGET=prod
+    DBT_TARGET=prod \
+    # dbt subprocesses resolve the CLI by bare name; put the venv on PATH. HOME must be
+    # writable so dbt can create ~/.dbt (it does this even with --profiles-dir set).
+    HOME=/app \
+    PATH="/app/.venv/bin:${PATH}"
 
 WORKDIR /app
 

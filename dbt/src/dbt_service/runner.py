@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,17 @@ from .config import Settings
 from .schemas import DbtModelInfo, DbtProjectInfo, DbtRunResult
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_dbt() -> str | None:
+    """Locate the dbt executable. Prefer PATH, then the venv that runs this process
+    (uvicorn launches from .venv/bin, which is not always on PATH in the container).
+    Returns None when dbt is genuinely absent."""
+    found = shutil.which("dbt")
+    if found:
+        return found
+    candidate = Path(sys.executable).parent / "dbt"
+    return str(candidate) if candidate.exists() else None
 
 _REF_RE = re.compile(r"ref\(\s*['\"]([^'\"]+)['\"]\s*\)")
 _SOURCE_RE = re.compile(r"source\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]\s*\)")
@@ -196,7 +208,7 @@ class DbtRunner:
             version=str(config.get("version", "")),
             target=self.settings.dbt_target,
             project_dir=str(self.project_dir),
-            dbt_cli_available=shutil.which("dbt") is not None,
+            dbt_cli_available=resolve_dbt() is not None,
             model_count=len(models),
             models=models,
         )
@@ -207,8 +219,13 @@ class DbtRunner:
 
     def run(self, command: str, select: str | None = None) -> DbtRunResult:  # pragma: no cover
         """Shell out to `dbt <command>` against the project (needs a live warehouse)."""
+        dbt_exe = resolve_dbt()
+        if dbt_exe is None:
+            raise RuntimeError(
+                "dbt CLI not found (not on PATH or in the venv) — the sidecar image must install dbt-bigquery"
+            )
         args = [
-            "dbt",
+            dbt_exe,
             command,
             "--project-dir",
             str(self.project_dir),
