@@ -15,6 +15,10 @@
 #   bucket = "<state_bucket>"                  # this repo's own tfstate bucket per project
 #   prefix = "terraform/state/<stack_name>"    # per-stack isolation within the bucket
 
+# Project layout (required): `multi-project` = one GCP project + tfstate bucket per
+# environment (this repo); `single-project` = one shared project + bucket with the
+# env encoded in the state prefix. See infra/tfs/src/tfs/config.py.
+layout: multi-project
 state_location: australia-southeast1
 environments:
   dev:

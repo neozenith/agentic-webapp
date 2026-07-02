@@ -52,4 +52,4 @@ def build_mxfile(graph: Graph, layout: Layout, *, title: str) -> str:
         'guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" math="0" shadow="0">'
         f"<root>{''.join(cells)}</root></mxGraphModel>"
     )
-    return f'<mxfile><diagram name={quoteattr(title)}>{model}</diagram></mxfile>'
+    return f"<mxfile><diagram name={quoteattr(title)}>{model}</diagram></mxfile>"

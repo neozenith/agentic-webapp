@@ -53,6 +53,35 @@ Two roots are discovered **independently** — the tool never assumes `infra/` a
   (override: `--infra-root` / `TFS_INFRA_ROOT`). All stack/module paths hang off this.
 - **repo root** — `git rev-parse --show-toplevel`; `.github/workflows/` lives here.
 
+## Project layouts (single- vs multi-project)
+
+`config.yml` declares a **required** `layout:` key that tells `tfs` how your GCP
+projects and tfstate are partitioned. It drives three things consistently — the
+project `check_project` guards, the state bucket, and the GCS prefix:
+
+| `layout:` | GCP project | tfstate bucket | GCS prefix | `environments:` shape |
+|---|---|---|---|---|
+| `multi-project` (this repo) | one **per env** | one **per env** | `terraform/state/<stack>` | map `{env: {project_id, state_bucket}}` |
+| `single-project` | one **shared** | one **shared** | `terraform/state/<env>/<stack>` | list `[dev, test, prod]` + top-level `project_id`/`state_bucket` |
+
+`tfs validate` checks each `backends/*.config` against the layout, and `tfs create`
+scaffolds new stacks with the matching bucket + prefix. A config whose shape doesn't
+match its declared `layout:` fails loudly (no silent mode inference).
+
+```yaml
+# multi-project (this repo)
+layout: multi-project
+environments:
+  dev:  { project_id: dbt-dev-jaffleshop,  state_bucket: ...-dev-...-tfstate }
+  ...
+
+# single-project
+layout: single-project
+project_id: my-project
+state_bucket: my-project-tfstate
+environments: [dev, test, prod]
+```
+
 ## Layout
 
 ```
@@ -61,7 +90,7 @@ infra/tfs/
 └── src/tfs/
     ├── app.py              # build_parser() + main() — argparse wiring only
     ├── roots.py            # find_infra_root() / find_repo_root()
-    ├── config.py           # VALID_ENVS, expected_prefix, load_config, list_stacks
+    ├── config.py           # layout_of, project_for/bucket_for, expected_prefix, list_stacks
     ├── backends.py         # backend *.config parsing + discovery
     ├── gcp.py              # check_project gcloud guardrail
     ├── errors.py           # typed exceptions

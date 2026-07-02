@@ -84,7 +84,9 @@ def _resolve_inline_url(repo: str, artifact_id: str, token: str) -> str:  # prag
     api = f"https://api.github.com/repos/{repo}/actions/artifacts/{artifact_id}/zip"
     headers = subprocess.run(
         ["curl", "-s", "-D", "-", "-o", "/dev/null", "-H", f"Authorization: Bearer {token}", api],
-        check=True, text=True, capture_output=True,
+        check=True,
+        text=True,
+        capture_output=True,
     ).stdout
     for line in headers.splitlines():
         if line.lower().startswith("location:"):
@@ -98,8 +100,11 @@ def _gh(*args: str) -> str:  # pragma: no cover - subprocess IO seam (gh CLI)
 
 def _upsert_comment(repo: str, pr: str, mark: str, body: str) -> None:  # pragma: no cover - gh IO
     existing = _gh(
-        "api", f"repos/{repo}/issues/{pr}/comments", "--paginate",
-        "--jq", f'.[] | select(.body | contains("{mark}")) | .id',
+        "api",
+        f"repos/{repo}/issues/{pr}/comments",
+        "--paginate",
+        "--jq",
+        f'.[] | select(.body | contains("{mark}")) | .id',
     ).strip()
     if existing:
         cid = existing.splitlines()[0]
@@ -110,7 +115,9 @@ def _upsert_comment(repo: str, pr: str, mark: str, body: str) -> None:  # pragma
         log.info("created sticky comment on PR #%s", pr)
 
 
-def post_comment(stack: str, env: str, mode: str, png_artifact_id: str, svg_artifact_id: str) -> None:  # pragma: no cover - gh IO orchestration
+def post_comment(
+    stack: str, env: str, mode: str, png_artifact_id: str, svg_artifact_id: str
+) -> None:  # pragma: no cover - gh IO orchestration
     repo = _require("GITHUB_REPOSITORY")
     token = _require("GH_TOKEN")
     pr = resolve_pr_number()

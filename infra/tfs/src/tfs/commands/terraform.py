@@ -90,7 +90,7 @@ def make_tf_handler(command: str):
         valid_stacks = list_stacks(infra_root)
         if args.stack not in valid_stacks:
             raise TFStackCLIInputError(f"Stack '{args.stack}' does not exist. Must be one of {valid_stacks}")
-        check_project(args.env)
+        check_project(args.env, infra_root)
         result = _run_tf(
             command,
             args.stack,

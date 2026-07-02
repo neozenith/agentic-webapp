@@ -29,14 +29,18 @@ def test_parse_backend_config(tmp_path: Path, content: str, expected: dict):
 
 
 @pytest.mark.parametrize(
-    "stack, expected",
+    "stack, environment, layout, expected",
     [
-        ("webapp", "terraform/state/webapp"),  # this repo's stack
-        ("monitoring", "terraform/state/monitoring"),  # per-stack convention
+        # multi-project: prefix is per-stack only (env lives in the per-env bucket)
+        ("webapp", "dev", "multi-project", "terraform/state/webapp"),
+        ("monitoring", "prod", "multi-project", "terraform/state/monitoring"),
+        # single-project: env is baked into the prefix (one shared bucket)
+        ("webapp", "dev", "single-project", "terraform/state/dev/webapp"),
+        ("monitoring", "prod", "single-project", "terraform/state/prod/monitoring"),
     ],
 )
-def test_expected_prefix(stack: str, expected: str):
-    assert expected_prefix(stack) == expected
+def test_expected_prefix(stack: str, environment: str, layout: str, expected: str):
+    assert expected_prefix(stack, environment, layout=layout) == expected
 
 
 def _make_infra(root: Path) -> Path:

@@ -44,7 +44,9 @@ def _load_plan_json(stack: str, env: str, infra_root: Path) -> dict:  # pragma: 
     return json.loads(out.stdout)
 
 
-def _render_svg(stack: str, env: str, mode: str, iam: str, infra_root: Path) -> tuple[Graph, str]:  # pragma: no cover - terraform subprocess IO
+def _render_svg(
+    stack: str, env: str, mode: str, iam: str, infra_root: Path
+) -> tuple[Graph, str]:  # pragma: no cover - terraform subprocess IO
     """plan -> graph -> layout -> draw.io-compatible SVG string. The shared render core."""
     doc = _load_plan_json(stack, env, infra_root)
     graph = plan_model.build_graph(doc, mode=mode, iam=iam)
@@ -64,7 +66,7 @@ def cmd_diagram(args: Namespace) -> None:  # pragma: no cover - terraform/cairo 
 
     if args.env is None:
         raise TFStackCLIInputError("env is required (one of dev/test/prod) unless --readme is given")
-    check_project(args.env)
+    check_project(args.env, infra_root)
 
     graph, svg = _render_svg(args.stack, args.env, args.mode, args.iam, infra_root)
 
@@ -93,7 +95,7 @@ def _diagram_readme(args: Namespace, infra_root: Path) -> None:  # pragma: no co
     env = args.env or _README_ENV
     if args.mode != "state":
         raise TFStackCLIInputError("--readme renders the architecture; it requires --mode state (the default).")
-    check_project(env)
+    check_project(env, infra_root)
 
     _, svg = _render_svg(args.stack, env, "state", args.iam, infra_root)
     fresh = svg.encode("utf-8")

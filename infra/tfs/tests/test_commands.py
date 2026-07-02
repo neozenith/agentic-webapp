@@ -19,11 +19,26 @@ def _infra(tmp_path: Path) -> Path:
     root = tmp_path / "infra"
     (root / "stacks").mkdir(parents=True)
     (root / "config.yml").write_text(
+        "layout: multi-project\n"
         "state_location: au\n"
         "environments:\n"
         "  dev:\n    project_id: proj-dev\n    state_bucket: bkt-dev\n"
         "  test:\n    project_id: proj-test\n    state_bucket: bkt-test\n"
         "  prod:\n    project_id: proj-prod\n    state_bucket: bkt-prod\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def _infra_single(tmp_path: Path) -> Path:
+    root = tmp_path / "infra"
+    (root / "stacks").mkdir(parents=True)
+    (root / "config.yml").write_text(
+        "layout: single-project\n"
+        "state_location: au\n"
+        "project_id: shared-proj\n"
+        "state_bucket: shared-bkt\n"
+        "environments: [dev, test, prod]\n",
         encoding="utf-8",
     )
     return root
@@ -46,6 +61,17 @@ def test_create_scaffolds_stack_and_workflow(tmp_path):
     # workflow scaffolded under the resolved repo root (.github lands at infra root here)
     wf = list(root.rglob("terraform-cicd-stack-monitoring.yml"))
     assert wf, "per-stack CI workflow not scaffolded"
+
+
+def test_create_single_project_bakes_env_into_prefix(tmp_path):
+    root = _infra_single(tmp_path)
+    cmd_create(Namespace(stack="monitoring", infra_root=str(root)))
+
+    stack = root / "stacks" / "monitoring"
+    for env in ("dev", "test", "prod"):
+        cfg = (stack / "backends" / f"{env}.config").read_text()
+        assert 'bucket = "shared-bkt"' in cfg  # one shared bucket for every env
+        assert f"terraform/state/{env}/monitoring" in cfg  # env-in-prefix convention
 
 
 def test_create_existing_stack_noops(tmp_path):
