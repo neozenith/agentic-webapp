@@ -32,7 +32,8 @@ on `infra/`.
 | `tfs validate` | Check every `stacks/*/backends/*.config` matches the state convention |
 | `tfs create <stack>` | Scaffold `stacks/<stack>/` + its per-stack GHA workflow |
 | `tfs gha-check` | Verify each stack has a matching CI workflow (and vice versa) |
-| `tfs diagram <stack> <env>` | Render a GCP architecture diagram (mingrammer `diagrams`) from terraform. `--mode state` (live infra, default) or `--mode plan` (delta, coloured by action); `--iam edges\|nodes`. Needs graphviz (`brew install graphviz`). Output → `infra/diagrams/`. |
+| `tfs diagram <stack> [env]` | Render a cloud architecture diagram from terraform, using vendored draw.io stencils (GCP/AWS/Azure/Kubernetes; ~180 resource types in `diagrams/registry.py`). Emits a **draw.io-compatible SVG** (editable in draw.io) **and a PNG**. `--mode state` (live infra, default) or `--mode plan` (delta, coloured by action); `--iam edges\|nodes`; `--out-dir`. PNG needs cairo (`brew install cairo` / `apt-get install libcairo2`). Output → `infra/diagrams/`. `--readme` embeds the prod-state SVG (no cairo) into `stacks/<stack>/README.md`; add `--check` to fail on a stale committed diagram. |
+| `tfs diagram-comment <stack> <env> --png-artifact-id ID --svg-artifact-id ID` | CI only: post/update the sticky PR comment linking the uploaded PNG + SVG artifacts (reads `GH_TOKEN`/PR context from the environment; no terraform/cloud access). |
 | `tfs init <stack> <env>` | `terraform init -reconfigure` |
 | `tfs plan <stack> <env>` | `terraform plan` |
 | `tfs apply <stack> <env>` | `terraform apply -auto-approve` |

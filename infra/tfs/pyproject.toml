@@ -7,9 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "jinja2>=3.1.5",
     "ruamel-yaml>=0.18.10",
-    # `tfs diagram` renders GCP architecture diagrams from terraform JSON.
-    # Requires the system `graphviz` (dot) binary at render time: brew install graphviz
-    "diagrams>=0.23.4",
+    # `tfs diagram` renders its own SVG from vendored draw.io stencils, then
+    # rasterizes to PNG via cairosvg. cairosvg needs the system cairo library at
+    # render time: brew install cairo / apt-get install libcairo2.
+    "cairosvg>=2.9.0",
 ]
 
 [project.scripts]
@@ -42,10 +43,12 @@ addopts = "--cov=src --cov-report=term-missing"
 [tool.coverage.run]
 # External-CLI orchestration + template codegen: exercised by live terraform/gcloud
 # runs and the CI pipeline, not unit-testable without mocks (banned) or a full
-# repo+git+graphviz integration harness. The pure-logic core (config/backends/roots/
-# validate/app) is covered to >=90%.
+# repo+git+cairo integration harness. The pure-logic core (config/backends/roots/
+# validate/app, the _terraform driver + build_tf_command, and every pure diagrams
+# module — plan_model/layout/drawio_model/svg_render/registry/stencils/readme/publish)
+# is unit-tested to >=90%. Only the thin terraform/cairo IO orchestrators are omitted.
 omit = [
-    "*/commands/diagram.py",
+    "*/diagrams/command.py",
     "*/commands/terraform.py",
     "*/commands/create.py",
     "*/commands/gha.py",
@@ -64,11 +67,11 @@ mypy_path = ["src"]
 
 # Untyped third-party libs.
 [[tool.mypy.overrides]]
-module = ["diagrams.*", "ruamel.*", "jinja2.*"]
+module = ["cairosvg.*", "ruamel.*", "jinja2.*"]
 ignore_missing_imports = true
 
-# External-CLI orchestration modules wrap untyped subprocess/diagrams output; they are
+# External-CLI orchestration modules wrap untyped subprocess/cairo output; they are
 # excluded from coverage and exercised by live runs, so strict typing is relaxed here.
 [[tool.mypy.overrides]]
-module = ["tfs.commands.diagram", "tfs.commands.terraform", "tfs.gcp"]
+module = ["tfs.diagrams.command", "tfs.commands.terraform", "tfs.gcp"]
 ignore_errors = true

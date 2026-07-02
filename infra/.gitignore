@@ -18,4 +18,6 @@ crash.*.log
 tmp/
 
 # Generated architecture diagrams (regenerate with `tfs diagram` / `make diagram`).
-diagrams/
+# Anchored to the infra root so it ignores the OUTPUT dir (infra/diagrams/) only,
+# never the tfs source package at infra/tfs/src/tfs/diagrams/.
+/diagrams/
