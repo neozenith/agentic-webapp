@@ -1,0 +1,41 @@
+name: 'agentic_webapp_dbt'
+version: '1.0.0'
+config-version: 2
+
+# Profile lives in this same directory (profiles.yml); the sidecar passes
+# --profiles-dir <DBT_PROJECT_DIR>, so dbt resolves it without ~/.dbt.
+profile: 'agentic_webapp_dbt'
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Materializations only. No per-model +schema override, so every model lands in
+# the dataset configured by the active profile target (BIGQUERY_DATASET, default
+# agentic_webapp) — staging as views, marts as tables.
+models:
+  agentic_webapp_dbt:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+  # Elementary's own models (dbt_invocations, dbt_run_results, dbt_models, ...).
+  # +schema: elementary => dbt's generate_schema_name yields <target_dataset>_elementary,
+  # i.e. agentic_webapp_elementary when the target dataset is agentic_webapp. That
+  # dataset is PRE-CREATED by Terraform: the runtime SA has only dataEditor and
+  # cannot create datasets, so Elementary must land in an existing one.
+  elementary:
+    +schema: elementary
+
+# Elementary autoupload toggles (read as flat top-level vars by elementary's
+# get_config_var). All default to false already; we set them explicitly so the
+# intent is loud: artifacts, run-results, and invocation metadata upload on
+# EVERY target (dev/test/prod), giving observability data everywhere — not
+# gated to prod.
+vars:
+  disable_dbt_artifacts_autoupload: false
+  disable_run_results: false
+  disable_tests_results: false
+  disable_dbt_invocation_autoupload: false

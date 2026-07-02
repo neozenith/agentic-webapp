@@ -24,6 +24,22 @@ resource "terraform_data" "image" {
   depends_on = [google_artifact_registry_repository.app]
 }
 
+# dbt sidecar image: dbt-core + the FastAPI health/run shim + libs/core. Same repo-root
+# context, its own cloudbuild.yaml and source hash. NOTE: dbt/cloudbuild.yaml and
+# dbt/Dockerfile are produced by the separate dbt/ subproject — this build wires to the
+# agreed path; it will fail loudly at apply if those files are absent (by design).
+resource "terraform_data" "dbt_image" {
+  count            = var.dbt_image == "" ? 1 : 0
+  triggers_replace = local.dbt_src_hash
+
+  provisioner "local-exec" {
+    working_dir = "${path.module}/../../.."
+    command     = "gcloud builds submit . --project ${local.project_id} --config dbt/cloudbuild.yaml --substitutions=_IMAGE=${local.dbt_image_base}:${local.dbt_src_hash}"
+  }
+
+  depends_on = [google_artifact_registry_repository.app]
+}
+
 # Agent sidecar image: the ADK agent + libs/core. Same repo-root context, its own
 # cloudbuild.yaml and its own source hash, so it rebuilds independently of the backend.
 resource "terraform_data" "agent_image" {

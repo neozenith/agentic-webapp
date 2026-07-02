@@ -1,0 +1,11 @@
+.venv/
+.env
+target/
+dbt_packages/
+logs/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+__pycache__/

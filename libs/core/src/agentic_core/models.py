@@ -2,7 +2,7 @@
 and the API surface."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -105,3 +105,213 @@ class ExtractionRecord(BaseModel):
     fields: dict[str, Any] = Field(default_factory=dict)
     model_id: str | None = None
     created_at: datetime
+
+
+# ============================================================================
+# Semantic layer — the top-down logical data model over the warehouse.
+#
+# The SemanticManager is the bridge between a human-described "Domain Model" and the
+# physical tables that dbt materialises in BigQuery. You describe the domain ONCE, in
+# business terms (entities, the things you measure, the ways you slice them); dbt makes
+# the physical models real; agents and dashboards query the *semantic* layer, never raw
+# SQL. This is the data→insight contract; the AnalyticsManager owns the insight→pixels
+# contract (DashboardSpec below).
+# ============================================================================
+
+AggFn = Literal["sum", "avg", "count", "count_distinct", "min", "max"]
+DimType = Literal["categorical", "time", "numeric", "boolean"]
+TimeGrain = Literal["day", "week", "month", "quarter", "year"]
+FilterOp = Literal["=", "!=", ">", ">=", "<", "<=", "in", "like"]
+
+
+class SemanticDimension(BaseModel):
+    """A way to slice an entity — a groupable attribute. `column` is the physical column
+    in the entity's table; `dtype` marks time dimensions (which support a grain)."""
+
+    name: str
+    column: str
+    dtype: DimType = "categorical"
+    description: str = ""
+
+
+class SemanticMeasure(BaseModel):
+    """A thing you measure — a quantitative aggregation over a column. The atom of every
+    metric. `column` is the physical column to aggregate ("*" for a row count)."""
+
+    name: str
+    column: str = "*"
+    agg: AggFn = "sum"
+    description: str = ""
+    # Optional display hint for the UI/dashboards (e.g. "$0,0.00", "0.0%"). Advisory only.
+    unit: str = ""
+
+
+class SemanticEntity(BaseModel):
+    """A logical table in the domain model — one business concept (a fuel purchase, a
+    maintenance event). Maps to exactly one physical table / dbt model (`table`) and
+    exposes the dimensions + measures the query layer is allowed to combine."""
+
+    name: str
+    description: str = ""
+    table: str
+    primary_key: str | None = None
+    # Name (not column) of the dimension used as the default time axis, if any.
+    time_dimension: str | None = None
+    dimensions: list[SemanticDimension] = Field(default_factory=list)
+    measures: list[SemanticMeasure] = Field(default_factory=list)
+
+
+class SemanticModel(BaseModel):
+    """The top-down logical data model for one domain: a named set of entities with their
+    dimensions and measures. Authored in the SemanticManager page, implemented physically
+    by the dbt sidecar, queried by agents over MCP and by the dashboard suite."""
+
+    model_id: str
+    name: str
+    description: str = ""
+    entities: list[SemanticEntity] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class SemanticFilter(BaseModel):
+    """A predicate on a dimension/column. `value` is a scalar (or list, for `in`)."""
+
+    field: str
+    op: FilterOp = "="
+    value: Any = None
+
+
+class SemanticQuery(BaseModel):
+    """A backend-agnostic analytical question against one entity: which measures to
+    aggregate, grouped by which dimensions, optionally filtered and time-grained. The
+    SemanticManager compiles this to BigQuery SQL (transparency / dbt parity) AND executes
+    it portably (in-memory aggregation locally, SQL push-down on BigQuery)."""
+
+    entity: str
+    measures: list[str] = Field(default_factory=list)
+    dimensions: list[str] = Field(default_factory=list)
+    filters: list[SemanticFilter] = Field(default_factory=list)
+    time_grain: TimeGrain | None = None
+    order_by: str | None = None
+    descending: bool = True
+    limit: int = 1000
+
+
+class SemanticQueryResult(BaseModel):
+    """The answer to a SemanticQuery: column-ordered tabular rows plus the compiled SQL so
+    a human (or agent) can see exactly what was run."""
+
+    columns: list[str]
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    sql: str = ""
+    row_count: int = 0
+
+
+# ============================================================================
+# dbt sidecar — typed views of the dbt-core project the sidecar manages.
+# These are response shapes the backend proxies from the dbt sidecar service; the dbt
+# project itself is the source of truth (see dbt/ at the repo root).
+# ============================================================================
+
+
+class DbtModelInfo(BaseModel):
+    """One node in the dbt project (a model/seed/source/test), distilled from `dbt ls`
+    + the manifest so the webapp can render the project without parsing dbt internals."""
+
+    name: str
+    resource_type: str = "model"
+    db_schema: str = ""
+    materialized: str = ""
+    description: str = ""
+    depends_on: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    path: str = ""
+
+
+class DbtRunResult(BaseModel):
+    """The outcome of a dbt command (run/test/build/compile). `nodes` are per-model results
+    parsed from dbt's run_results.json; stdout/stderr are kept for the UI log panel."""
+
+    command: str
+    success: bool
+    return_code: int = 0
+    stdout: str = ""
+    stderr: str = ""
+    nodes: list[dict[str, Any]] = Field(default_factory=list)
+    elapsed_seconds: float = 0.0
+
+
+class DbtInvocation(BaseModel):
+    """One dbt run, distilled from Elementary's `dbt_invocations` + `dbt_run_results` — the
+    overview scatter's datum (one point per run)."""
+
+    invocation_id: str
+    command: str = ""
+    run_started_at: str | None = None
+    run_completed_at: str | None = None
+    target_name: str = ""
+    dbt_version: str = ""
+    n_nodes: int = 0
+    wall_secs: float = 0.0
+    has_failures: bool = False
+
+
+class DbtGanttNode(BaseModel):
+    """One executed node on the run gantt: a bar on its thread lane."""
+
+    thread_id: str
+    node_id: str
+    name: str
+    resource_type: str = "model"
+    status: str = ""
+    start_offset_secs: float = 0.0
+    duration_secs: float = 0.0
+
+
+class DbtGantt(BaseModel):
+    """A single invocation's execution timeline (Elementary `dbt_run_results`): thread lanes
+    on the y-axis, seconds-from-wall-start on the x-axis."""
+
+    invocation_id: str
+    wall_secs: float = 0.0
+    threads: list[str] = Field(default_factory=list)
+    nodes: list[DbtGanttNode] = Field(default_factory=list)
+
+
+# ============================================================================
+# Dashboards — the AnalyticsManager's insight→pixels contract.
+# A chart binds a SemanticQuery (data) to a Plotly figure template (pixels); `encoding`
+# is the JSON that maps result columns onto Plotly trace fields. Rendered in the web
+# dashboard suite AND inline in agent chat via MCP-UI.
+# ============================================================================
+
+ChartType = Literal["bar", "line", "area", "scatter", "pie", "table", "kpi"]
+
+
+class DashboardChart(BaseModel):
+    """One chart: a semantic query whose result columns are projected onto a Plotly figure.
+    `encoding` is the Data→Pixels map (e.g. {"x":"month","y":"total_cost"}); `layout`
+    holds Plotly layout overrides (titles, axis formats)."""
+
+    chart_id: str
+    title: str
+    description: str = ""
+    chart_type: ChartType = "bar"
+    query: SemanticQuery
+    encoding: dict[str, str] = Field(default_factory=dict)
+    layout: dict[str, Any] = Field(default_factory=dict)
+
+
+class DashboardSpec(BaseModel):
+    """A page of charts curated by the AnalyticsManager — the tangible 'dashboard transform'
+    the frontend loads and the MCP renders inline. Each chart binds to a SemanticQuery, so
+    a dashboard is always backed by the logical data model, never hand-written SQL."""
+
+    dashboard_id: str
+    name: str
+    description: str = ""
+    semantic_model_id: str | None = None
+    charts: list[DashboardChart] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime

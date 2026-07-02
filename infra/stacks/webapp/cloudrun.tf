@@ -95,6 +95,12 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "AGENT_BASE_URL"
         value = "http://localhost:8081"
       }
+      # The dbt sidecar listens on localhost:8082 in the same instance; the backend
+      # proxies dbt calls to it (mirrors AGENT_BASE_URL above).
+      env {
+        name  = "DBT_BASE_URL"
+        value = "http://localhost:8082"
+      }
 
       ports {
         container_port = var.container_port
@@ -110,8 +116,8 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
-      # Boot the agent sidecar first so the proxy is ready on cold start.
-      depends_on = ["agent"]
+      # Boot both sidecars first so the proxies are ready on cold start.
+      depends_on = ["agent", "dbt"]
     }
 
     # --- Sidecar container: the ADK agent (keyless Vertex via the shared runtime SA;
@@ -186,6 +192,73 @@ resource "google_cloud_run_v2_service" "app" {
         failure_threshold = 30
       }
     }
+
+    # --- Sidecar container: the dbt-core runner. A FastAPI shim (GET /health on 8082)
+    # fronts dbt; the backend proxies dbt calls here via DBT_BASE_URL. No ports block:
+    # localhost-only, like the agent. Materialises the MARTS (fct_fuel_purchases,
+    # fct_maintenance, agg_vehicle_costs_yearly) into the agentic_webapp dataset at
+    # runtime, using the shared runtime SA's dataEditor + jobUser grants.
+    #
+    # KNOWN TRADE-OFF: dbt is batch/long-running, while Cloud Run is request-scaled
+    # (cpu_idle = true throttles CPU between requests). A sidecar is acceptable for a
+    # first-pass review deploy; a dedicated Cloud Run Job is the longer-term home for
+    # the batch dbt workload.
+    containers {
+      name  = "dbt"
+      image = local.dbt_image # built in-DAG by terraform_data.dbt_image (build.tf), or var.dbt_image pin
+
+      env {
+        name  = "PORT"
+        value = "8082"
+      }
+      env {
+        name  = "GCP_PROJECT"
+        value = local.project_id
+      }
+      env {
+        name  = "BIGQUERY_DATASET"
+        value = google_bigquery_dataset.app.dataset_id
+      }
+      env {
+        name  = "BIGQUERY_LOCATION"
+        value = var.region
+      }
+      env {
+        name  = "DBT_TARGET"
+        value = var.environment
+      }
+      # Path the dbt project lives at inside the image. MUST match the dbt/Dockerfile's
+      # WORKDIR / COPY destination: the sidecar image puts dbt_project.yml + models at /app.
+      env {
+        name  = "DBT_PROJECT_DIR"
+        value = "/app"
+      }
+      # Where Elementary materialises its observability metadata (pre-created in bigquery.tf).
+      # The sidecar's run-history endpoints read dbt_invocations / dbt_run_results from here.
+      env {
+        name  = "ELEMENTARY_DATASET"
+        value = google_bigquery_dataset.elementary.dataset_id
+      }
+
+      resources {
+        cpu_idle = true
+        limits = {
+          cpu    = "1"
+          memory = "1Gi"
+        }
+      }
+
+      # Required because the backend container depends_on this one: Cloud Run needs a
+      # startup probe to know the dbt sidecar is ready before starting the backend.
+      startup_probe {
+        tcp_socket {
+          port = 8082
+        }
+        period_seconds    = 5
+        timeout_seconds   = 3
+        failure_threshold = 30
+      }
+    }
   }
 
   # Both image builds must push BEFORE the service is created/updated, so the source-hash
@@ -197,6 +270,7 @@ resource "google_cloud_run_v2_service" "app" {
     google_project_service.aiplatform,
     terraform_data.image,
     terraform_data.agent_image,
+    terraform_data.dbt_image,
   ]
 }
 

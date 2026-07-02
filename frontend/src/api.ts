@@ -505,3 +505,272 @@ export async function fetchRawSession(userId: string, sessionId: string): Promis
   if (!resp.ok) throw new Error(`session error ${resp.status}`);
   return resp.json();
 }
+
+// --- Semantic layer (/api/semantic): entities, dimensions, measures + a query runner ---
+export interface SemanticDimension {
+  name: string;
+  column: string;
+  dtype: string;
+  description: string;
+}
+export interface SemanticMeasure {
+  name: string;
+  column: string;
+  agg: string;
+  description: string;
+  unit: string;
+}
+export interface SemanticEntity {
+  name: string;
+  description: string;
+  table: string;
+  primary_key?: string;
+  time_dimension?: string;
+  dimensions: SemanticDimension[];
+  measures: SemanticMeasure[];
+}
+export interface SemanticModel {
+  model_id: string;
+  name: string;
+  description: string;
+  entities: SemanticEntity[];
+  created_at: string;
+  updated_at: string;
+}
+export interface SemanticFilter {
+  field: string;
+  op: string;
+  value: unknown;
+}
+export interface SemanticQuery {
+  entity: string;
+  measures: string[];
+  dimensions: string[];
+  filters: SemanticFilter[];
+  time_grain?: string | null;
+  order_by?: string | null;
+  descending: boolean;
+  limit: number;
+}
+export interface SemanticQueryResult {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  sql: string;
+  row_count: number;
+}
+
+export async function listSemanticModels(): Promise<SemanticModel[]> {
+  const resp = await apiFetch("/api/semantic/models");
+  if (!resp.ok) throw new Error(`semantic models error ${resp.status}`);
+  return resp.json();
+}
+
+export async function getSemanticModel(id: string): Promise<SemanticModel> {
+  const resp = await apiFetch(`/api/semantic/models/${encodeURIComponent(id)}`);
+  if (!resp.ok) throw new Error(`semantic model error ${resp.status}`);
+  return resp.json();
+}
+
+export async function runSemanticQuery(modelId: string, query: SemanticQuery): Promise<SemanticQueryResult> {
+  const resp = await apiFetch("/api/semantic/query", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model_id: modelId, query }),
+  });
+  if (!resp.ok) throw new Error(`semantic query error ${resp.status}`);
+  return resp.json();
+}
+
+/** A model write payload (CRUD). entities is the full entity list to persist. */
+export interface SemanticModelEdit {
+  name: string;
+  description: string;
+  entities: SemanticEntity[];
+}
+
+export async function createSemanticModel(edit: SemanticModelEdit): Promise<SemanticModel> {
+  const resp = await apiFetch("/api/semantic/models", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+  if (!resp.ok) throw new Error(`create semantic model error ${resp.status}`);
+  return resp.json();
+}
+
+export async function updateSemanticModel(id: string, edit: SemanticModelEdit): Promise<SemanticModel> {
+  const resp = await apiFetch(`/api/semantic/models/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+  if (!resp.ok) throw new Error(`update semantic model error ${resp.status}`);
+  return resp.json();
+}
+
+export async function deleteSemanticModel(id: string): Promise<void> {
+  const resp = await apiFetch(`/api/semantic/models/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!resp.ok && resp.status !== 204) throw new Error(`delete semantic model error ${resp.status}`);
+}
+
+// --- dbt (/api/dbt): project introspection + run/test/build/compile ---
+export interface DbtModelInfo {
+  name: string;
+  resource_type: string;
+  db_schema: string;
+  materialized: string;
+  description: string;
+  depends_on: string[];
+  tags: string[];
+  path: string;
+}
+export interface DbtRunResult {
+  command: string;
+  success: boolean;
+  return_code: number;
+  stdout: string;
+  stderr: string;
+  nodes: Record<string, unknown>[];
+  elapsed_seconds: number;
+}
+export interface DbtProject {
+  name: string;
+  profile: string;
+  version: string;
+  target: string;
+  project_dir: string;
+  dbt_cli_available: boolean;
+  model_count: number;
+  models: DbtModelInfo[];
+}
+
+export async function getDbtProject(): Promise<DbtProject> {
+  const resp = await apiFetch("/api/dbt/project");
+  if (!resp.ok) throw new Error(`dbt project error ${resp.status}`);
+  return resp.json();
+}
+
+export async function listDbtModels(): Promise<DbtModelInfo[]> {
+  const resp = await apiFetch("/api/dbt/models");
+  if (!resp.ok) throw new Error(`dbt models error ${resp.status}`);
+  return resp.json();
+}
+
+export type DbtCommand = "run" | "test" | "build" | "compile";
+
+export async function runDbt(command: DbtCommand, select?: string): Promise<DbtRunResult> {
+  const resp = await apiFetch(`/api/dbt/${command}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ select: select ?? null }),
+  });
+  if (!resp.ok) throw new Error(`dbt ${command} error ${resp.status}`);
+  return resp.json();
+}
+
+// --- Dashboards (/api/dashboards): specs + a server-rendered figure payload ---
+export interface DashboardChart {
+  chart_id: string;
+  title: string;
+  description: string;
+  chart_type: string;
+  query: SemanticQuery;
+  encoding: Record<string, string>;
+  layout: Record<string, unknown>;
+}
+export interface DashboardSpec {
+  dashboard_id: string;
+  name: string;
+  description: string;
+  semantic_model_id?: string;
+  charts: DashboardChart[];
+  created_at: string;
+  updated_at: string;
+}
+export interface PlotlyFigure {
+  data: unknown[];
+  layout: Record<string, unknown>;
+}
+export interface ChartRender {
+  chart_id: string;
+  title: string;
+  chart_type: string;
+  figure: PlotlyFigure;
+  value: number | null;
+  result: SemanticQueryResult;
+  error: string | null;
+}
+export interface DashboardRender {
+  dashboard_id: string;
+  name: string;
+  description: string;
+  semantic_model_id: string | null;
+  charts: ChartRender[];
+}
+
+export async function listDashboards(): Promise<DashboardSpec[]> {
+  const resp = await apiFetch("/api/dashboards");
+  if (!resp.ok) throw new Error(`dashboards error ${resp.status}`);
+  return resp.json();
+}
+
+/** Optional timespine overrides for a dashboard render: re-bucket by `grain` and/or
+ * date-filter the whole dashboard to the [start, end] window (ISO dates). */
+export interface RenderParams {
+  grain?: string;
+  start?: string;
+  end?: string;
+}
+
+export async function renderDashboard(id: string, params?: RenderParams): Promise<DashboardRender> {
+  const qs = new URLSearchParams();
+  if (params?.grain) qs.set("grain", params.grain);
+  if (params?.start) qs.set("start", params.start);
+  if (params?.end) qs.set("end", params.end);
+  const query = qs.toString();
+  const resp = await apiFetch(`/api/dashboards/${encodeURIComponent(id)}/render${query ? `?${query}` : ""}`);
+  if (!resp.ok) throw new Error(`dashboard render error ${resp.status}`);
+  return resp.json();
+}
+
+// --- dbt observability (/api/dbt/observability): Elementary-backed run history ---
+export interface DbtInvocation {
+  invocation_id: string;
+  command: string;
+  run_started_at: string;
+  run_completed_at: string;
+  target_name: string;
+  dbt_version: string;
+  n_nodes: number;
+  wall_secs: number;
+  has_failures: boolean;
+}
+
+export interface DbtGanttNode {
+  thread_id: string;
+  node_id: string;
+  name: string;
+  resource_type: string;
+  status: string;
+  start_offset_secs: number;
+  duration_secs: number;
+}
+
+export interface DbtGantt {
+  invocation_id: string;
+  wall_secs: number;
+  threads: string[];
+  nodes: DbtGanttNode[];
+}
+
+export async function listDbtInvocations(days = 30): Promise<DbtInvocation[]> {
+  const resp = await apiFetch(`/api/dbt/observability/invocations?days=${days}`);
+  if (!resp.ok) throw new Error(`dbt invocations error ${resp.status}`);
+  return resp.json();
+}
+
+export async function getDbtGantt(id: string): Promise<DbtGantt> {
+  const resp = await apiFetch(`/api/dbt/observability/invocations/${encodeURIComponent(id)}`);
+  if (!resp.ok) throw new Error(`dbt gantt error ${resp.status}`);
+  return resp.json();
+}

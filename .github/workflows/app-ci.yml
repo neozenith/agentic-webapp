@@ -11,6 +11,7 @@ on:
       - "libs/**"
       - "agent/**"
       - "cli/**"
+      - "dbt/**"
       - "infra/**"
       - "scripts/**"
       - "Makefile"
@@ -36,6 +37,8 @@ jobs:
           - { dir: agent, emulator: true }
           # cli boots the real backend in-process with in-memory backends — no emulator.
           - { dir: cli, emulator: false }
+          # dbt sidecar: FastAPI service tests over the real dbt project files (no warehouse).
+          - { dir: dbt, emulator: false }
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0

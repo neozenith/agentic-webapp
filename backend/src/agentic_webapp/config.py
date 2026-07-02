@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     firestore_database: str | None = None
     asset_metadata_table: str = "asset_metadata"
     llm_usage_table: str = "llm_usage"
+    # Semantic-layer + dashboard stores (live on the analytics BigQuery axis, in-memory locally).
+    semantic_models_table: str = "semantic_models"
+    dashboards_table: str = "dashboards"
+    # Seed the worked fuel-tracking example into the in-memory analytics store on startup
+    # (local/dev only — never touches a real warehouse; dbt + Terraform own cloud tables).
+    seed_demo_domain: bool = True
     # SA whose identity signs V4 URLs via IAM (needed on Cloud Run, which has no key
     # file). Usually the Cloud Run runtime SA; it must hold Token Creator on itself.
     signing_service_account: str | None = None
@@ -59,6 +65,12 @@ class Settings(BaseSettings):
     # Base URL of the ADK agent sidecar the backend reverse-proxies to. In Cloud
     # Run (single service) it's localhost; in docker-compose it's the service name.
     agent_base_url: str = "http://localhost:8081"
+
+    # The dbt-core sidecar. When set, /api/dbt/* proxies to it over HTTP (cloud + docker
+    # compose). When unset, the backend manages the local dbt/ project directly via the
+    # filesystem client (lists models offline; run/test shell out to the dbt CLI if present).
+    dbt_base_url: str | None = None
+    dbt_project_dir: Path = Path("dbt")
 
     # Loopback URL the mounted MCP server uses to call the core API as an ordinary
     # external client (so it traverses the same middleware + RBAC). None → derived

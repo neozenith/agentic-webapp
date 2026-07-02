@@ -1,0 +1,74 @@
+version: 2
+
+models:
+  - name: fct_fuel_purchases
+    description: >
+      Fuel-purchase fact table, one row per fill-up. Carries the typed receipt
+      fields plus `distance_km`, the kilometres travelled since the previous
+      fill-up of the same vehicle (odometer delta; 0 for the first fill-up).
+    columns:
+      - name: purchase_id
+        description: "Primary key; equals stg_fuel_receipts.purchase_id."
+        tests:
+          - not_null
+          - unique
+      - name: purchased_at
+        description: "Purchase date (DATE)."
+      - name: vehicle
+        description: "Vehicle the fuel was bought for."
+      - name: station
+        description: "Fuel station / vendor name."
+      - name: fuel_type
+        description: "Fuel grade."
+      - name: litres
+        description: "Volume purchased in litres (FLOAT64)."
+      - name: price_per_litre
+        description: "Unit price per litre (FLOAT64)."
+      - name: total_cost
+        description: "Total amount paid (FLOAT64)."
+      - name: odometer_km
+        description: "Odometer reading at fill-up in kilometres (INT64)."
+      - name: distance_km
+        description: "Kilometres since the previous fill-up of this vehicle (0 for the first)."
+
+  - name: fct_maintenance
+    description: >
+      Maintenance fact table, one row per service event. Stable mart projection
+      of stg_maintenance for downstream semantic models.
+    columns:
+      - name: maintenance_id
+        description: "Primary key; equals stg_maintenance.maintenance_id."
+        tests:
+          - not_null
+          - unique
+      - name: serviced_at
+        description: "Service date (DATE)."
+      - name: vehicle
+        description: "Vehicle that was serviced."
+      - name: category
+        description: "Maintenance category."
+      - name: vendor
+        description: "Workshop / service provider name."
+      - name: total_cost
+        description: "Total amount paid for the service (FLOAT64)."
+
+  - name: agg_vehicle_costs_yearly
+    description: >
+      Per-vehicle, per-year cost rollup. Combines fuel spend (from
+      fct_fuel_purchases) and maintenance spend (from fct_maintenance) via a
+      full join on (vehicle, year); total_cost is their sum.
+    columns:
+      - name: vehicle
+        description: "Vehicle the costs belong to."
+        tests:
+          - not_null
+      - name: year
+        description: "Calendar year (INT64)."
+        tests:
+          - not_null
+      - name: fuel_cost
+        description: "Total fuel spend for the vehicle in the year."
+      - name: maintenance_cost
+        description: "Total maintenance spend for the vehicle in the year."
+      - name: total_cost
+        description: "fuel_cost + maintenance_cost."

@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: stg_consulting__engagements
+    description: "Typed consulting engagements, one row per engagement."
+    columns:
+      - name: engagement_id
+        description: "Primary key; equals raw_engagements.engagement_id."
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_consulting__time_entries
+    description: "Typed time entries logged against engagements."
+    columns:
+      - name: time_entry_id
+        description: "Primary key; equals raw_time_entries.time_entry_id."
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_consulting__financials
+    description: "Typed engagement financials, one row per engagement per period."
+    columns:
+      - name: financial_id
+        description: "Primary key; equals raw_financials.financial_id."
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_consulting__deliverables
+    description: "Typed deliverables, one row per engagement deliverable."
+    columns:
+      - name: deliverable_id
+        description: "Primary key; equals raw_deliverables.deliverable_id."
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_consulting__invoices
+    description: "Typed invoices, one row per invoice issued for an engagement."
+    columns:
+      - name: invoice_id
+        description: "Primary key; equals raw_invoices.invoice_id."
+        tests:
+          - not_null
+          - unique

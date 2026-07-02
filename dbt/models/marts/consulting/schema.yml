@@ -1,0 +1,123 @@
+version: 2
+
+models:
+  - name: dim_engagements
+    description: >
+      Engagement dimension, one row per consulting engagement. Output contract
+      bound by a downstream semantic model; do not rename columns.
+    columns:
+      - name: engagement_id
+        description: "Primary key."
+        tests:
+          - not_null
+          - unique
+      - name: name
+        description: "Engagement name."
+      - name: client
+        description: "Client the engagement is for."
+      - name: service_line
+        description: "Service line / practice area."
+      - name: lead_consultant
+        description: "Lead consultant accountable for the engagement."
+      - name: phase
+        description: "Current delivery phase."
+      - name: status
+        description: "Engagement status."
+      - name: rag_overall
+        description: "Overall RAG (red/amber/green) health."
+      - name: start_date
+        description: "Engagement start date (DATE)."
+      - name: end_date
+        description: "Engagement end date (DATE)."
+      - name: contract_value
+        description: "Total contract value (NUMERIC)."
+      - name: revenue_to_date
+        description: "Revenue recognised to date (NUMERIC)."
+      - name: margin_pct
+        description: "Margin percentage (FLOAT64)."
+
+  - name: fct_time_entries
+    description: "Time-entry fact table, one row per logged time entry."
+    columns:
+      - name: time_entry_id
+        description: "Primary key."
+        tests:
+          - not_null
+          - unique
+      - name: entry_date
+        description: "Date the time was logged (DATE)."
+      - name: consultant
+        description: "Consultant who logged the time."
+      - name: engagement
+        description: "Engagement the time was logged against."
+      - name: role
+        description: "Role the consultant worked in."
+      - name: hours
+        description: "Hours logged (FLOAT64)."
+      - name: billable
+        description: "Whether the time is billable (BOOL)."
+      - name: cost
+        description: "Cost of the logged time (NUMERIC)."
+
+  - name: fct_engagement_financials
+    description: "Engagement-financials fact table, one row per engagement per period."
+    columns:
+      - name: financial_id
+        description: "Primary key."
+        tests:
+          - not_null
+          - unique
+      - name: period
+        description: "Financial period (DATE)."
+      - name: engagement
+        description: "Engagement the financials belong to."
+      - name: client
+        description: "Client the engagement is for."
+      - name: revenue
+        description: "Revenue in the period (NUMERIC)."
+      - name: cost
+        description: "Cost in the period (NUMERIC)."
+      - name: margin
+        description: "Margin in the period (NUMERIC); revenue - cost."
+
+  - name: fct_deliverables
+    description: "Deliverables fact table, one row per engagement deliverable."
+    columns:
+      - name: deliverable_id
+        description: "Primary key."
+        tests:
+          - not_null
+          - unique
+      - name: engagement
+        description: "Engagement the deliverable belongs to."
+      - name: name
+        description: "Deliverable name."
+      - name: status
+        description: "Deliverable status."
+      - name: rag
+        description: "Deliverable RAG (red/amber/green) health."
+      - name: due_date
+        description: "Due date (DATE)."
+      - name: progress
+        description: "Percent complete (INT64)."
+
+  - name: fct_invoices
+    description: "Invoices fact table, one row per invoice issued for an engagement."
+    columns:
+      - name: invoice_id
+        description: "Primary key."
+        tests:
+          - not_null
+          - unique
+      - name: engagement
+        description: "Engagement the invoice is for."
+      - name: client
+        description: "Client billed."
+      - name: issued_at
+        description: "Invoice issue date (DATE)."
+      - name: due_date
+        description: "Invoice due date (DATE)."
+      - name: amount
+        description: "Invoice amount (NUMERIC)."
+      - name: status
+        description: "Invoice status."

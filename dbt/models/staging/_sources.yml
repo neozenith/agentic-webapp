@@ -1,0 +1,37 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Raw document extractions produced by the agentic-webapp pipeline. One row
+      per extracted document; the document-specific fields live as a JSON object
+      in `fields_json` and are unpacked by the staging models.
+    # database = the GCP project (env-driven so dev/test/prod resolve correctly).
+    # schema = the BigQuery dataset that holds the raw table.
+    database: "{{ env_var('GCP_PROJECT') }}"
+    schema: agentic_webapp
+    tables:
+      - name: extractions
+        description: "All document extractions across every doc_type."
+        columns:
+          - name: extraction_id
+            description: "Unique id of the extraction (primary key)."
+            tests:
+              - not_null
+              - unique
+          - name: asset_id
+            description: "Id of the source asset (image/PDF) the fields came from."
+          - name: doc_type
+            description: "Document class, e.g. 'fuel_receipt' or 'maintenance'."
+            tests:
+              - not_null
+          - name: user_id
+            description: "Owning user (IAP email identity)."
+          - name: session_id
+            description: "Chat/session id the extraction was created in."
+          - name: fields_json
+            description: "STRING column holding a JSON object of the extracted fields."
+          - name: model_id
+            description: "LLM model id that produced the extraction."
+          - name: created_at
+            description: "Timestamp the extraction was created."

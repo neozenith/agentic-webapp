@@ -1,0 +1,7 @@
+packages:
+  # Elementary observability: materializes dbt artifact tables (dbt_invocations,
+  # dbt_run_results, dbt_models, ...) and uploads run metadata on every run via
+  # auto-registered on-run-end hooks. The sidecar's /observability endpoints read
+  # those tables back. Range chosen for dbt-core 1.11 compatibility.
+  - package: elementary-data/elementary
+    version: [">=0.18.0", "<0.25.0"]

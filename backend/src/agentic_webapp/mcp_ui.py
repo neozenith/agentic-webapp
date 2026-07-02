@@ -14,6 +14,8 @@ they are trivially unit-testable; only `fetch_visible` does I/O.
 from __future__ import annotations
 
 import html
+import json
+from typing import Any
 
 import httpx
 from agentic_core.models import AssetMetadata, Folder
@@ -119,6 +121,110 @@ def render_browse(folders: list[Folder], assets: list[AssetMetadata], *, folder_
         }
     )
     return resource
+
+
+# ---------------------------------------------------------------------------------------
+# Inline dashboards — the AnalyticsManager data→pixels artifact rendered in chat.
+#
+# Same MCP-UI contract as browse: fetch through the existing /api/* routes (RBAC inherited),
+# then build a sandboxed-iframe HTML resource. The figures come pre-built by the backend
+# (figures.build_figure), so the inline chat dashboard and the web dashboard suite render the
+# IDENTICAL Plotly figures. Plotly loads from its CDN inside the sandboxed iframe (allow-scripts).
+# ---------------------------------------------------------------------------------------
+
+
+async def fetch_dashboards(client: httpx.AsyncClient) -> list[dict[str, Any]]:
+    """The caller's visible dashboards (id + name), via the loopback /api client (RBAC inherited)."""
+    resp = await client.get("/api/dashboards")
+    resp.raise_for_status()
+    data: list[dict[str, Any]] = resp.json()
+    return data
+
+
+async def fetch_dashboard_render(client: httpx.AsyncClient, dashboard_id: str) -> dict[str, Any]:
+    """A dashboard with every chart resolved to a Plotly figure (the /render transform)."""
+    resp = await client.get(f"/api/dashboards/{dashboard_id}/render")
+    resp.raise_for_status()
+    data: dict[str, Any] = resp.json()
+    return data
+
+
+def dashboard_summary(render: dict[str, Any]) -> str:
+    """A short, model-facing line describing the rendered dashboard (the HTML is for the host)."""
+    charts = render.get("charts", [])
+    kpis = [c for c in charts if c.get("chart_type") == "kpi"]
+    return (
+        f"Rendered dashboard “{render.get('name', '')}”: {len(charts)} chart(s)"
+        f"{f', {len(kpis)} KPI(s)' if kpis else ''}."
+    )
+
+
+def render_dashboard_ui(render: dict[str, Any]) -> EmbeddedResource:
+    """Build the inline dashboard UI resource from a /render payload (charts carry figures)."""
+    cards: list[str] = []
+    plots: list[str] = []
+    for i, chart in enumerate(render.get("charts", [])):
+        title = html.escape(str(chart.get("title", "")))
+        if chart.get("error"):
+            cards.append(f'<div class="card err"><div class="t">{title}</div>'
+                         f'<div class="msg">⚠ {html.escape(str(chart["error"]))}</div></div>')
+        elif chart.get("chart_type") == "kpi":
+            value = chart.get("value")
+            shown = f"{value:,.2f}" if isinstance(value, (int, float)) else "—"
+            cards.append(f'<div class="card kpi"><div class="val">{html.escape(shown)}</div>'
+                         f'<div class="t">{title}</div></div>')
+        else:
+            fig = json.dumps(chart.get("figure", {"data": [], "layout": {}}))
+            cards.append(f'<div class="card"><div id="plot{i}" class="plot"></div></div>')
+            plots.append(f'Plotly.newPlot("plot{i}",{fig}.data,'
+                         f'Object.assign({{margin:{{t:30,r:12,b:36,l:48}},height:260,'
+                         f'paper_bgcolor:"transparent",plot_bgcolor:"transparent"}},{fig}.layout),'
+                         f'{{displayModeBar:false,responsive:true}});')
+    body = _DASHBOARD_PAGE.format(
+        name=html.escape(str(render.get("name", "Dashboard"))),
+        description=html.escape(str(render.get("description", ""))),
+        cards="".join(cards) or '<div class="empty">No charts.</div>',
+        plot_calls="\n".join(plots),
+    )
+    resource: EmbeddedResource = create_ui_resource(
+        {
+            "uri": f"ui://dashboard/{render.get('dashboard_id', 'unknown')}",
+            "content": {"type": "rawHtml", "htmlString": body},
+            "encoding": "text",
+        }
+    )
+    return resource
+
+
+_DASHBOARD_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  body {{ font: 14px system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; color: #111; }}
+  h1 {{ font-size: 16px; margin: 0 0 2px; }}
+  p.sub {{ color: #666; margin: 0 0 14px; font-size: 13px; }}
+  .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }}
+  .card {{ border: 1px solid #e4e4e7; border-radius: 12px; padding: 10px; background: #fff; }}
+  .card .t {{ font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: .03em; }}
+  .card.kpi {{ display: flex; flex-direction: column; justify-content: center; align-items: center; }}
+  .card.kpi .val {{ font-size: 30px; font-weight: 700; color: #0f766e; }}
+  .card.err .msg {{ color: #b91c1c; margin-top: 6px; font-size: 13px; }}
+  .plot {{ width: 100%; height: 260px; }}
+  .empty {{ color: #999; font-style: italic; }}
+</style></head>
+<body>
+  <h1>{name}</h1>
+  <p class="sub">{description}</p>
+  <div class="grid">{cards}</div>
+  <script>
+    {plot_calls}
+    function reportSize() {{
+      window.parent.postMessage({{ type: "ui-size", height: document.documentElement.scrollHeight }}, "*");
+    }}
+    window.addEventListener("load", reportSize);
+    setTimeout(reportSize, 400);
+  </script>
+</body></html>"""
 
 
 # Static shell. User-controlled strings are html-escaped before they reach here; the iframe
