@@ -3,6 +3,7 @@
 import pytest
 
 from tfs.config import (
+    acceptable_prefixes,
     bucket_for,
     environments_of,
     expected_prefix,
@@ -56,9 +57,19 @@ def test_bucket_for_resolves_per_layout():
     assert bucket_for(SINGLE, "prod") == "shared-bkt"  # one bucket for every env
 
 
-def test_expected_prefix_per_layout():
-    assert expected_prefix("webapp", "dev", layout="multi-project") == "terraform/state/webapp"
-    assert expected_prefix("webapp", "dev", layout="single-project") == "terraform/state/dev/webapp"
+def test_expected_prefix_is_env_baked_for_both_layouts():
+    # the canonical prefix no longer depends on layout — both collapse to env-baked
+    assert expected_prefix("webapp", "dev") == "terraform/state/dev/webapp"
+    assert expected_prefix("monitoring", "prod") == "terraform/state/prod/monitoring"
+
+
+def test_acceptable_prefixes_multi_tolerates_legacy_single_does_not():
+    # multi-project: canonical env-baked PLUS the legacy env-less form (safe — per-env bucket)
+    multi = acceptable_prefixes("webapp", "dev", layout="multi-project")
+    assert multi == ["terraform/state/dev/webapp", "terraform/state/webapp"]
+    # single-project: canonical only — an env-less prefix would collide in the shared bucket
+    single = acceptable_prefixes("webapp", "dev", layout="single-project")
+    assert single == ["terraform/state/dev/webapp"]
 
 
 def test_validate_config_shape_accepts_valid():

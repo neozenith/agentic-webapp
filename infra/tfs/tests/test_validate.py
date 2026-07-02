@@ -40,9 +40,18 @@ def _backend(root: Path, stack: str, env: str, bucket: str, prefix: str) -> None
     (d / f"{env}.config").write_text(f'bucket = "{bucket}"\nprefix = "{prefix}"\n', encoding="utf-8")
 
 
-def test_validate_accepts_conventional_config(tmp_path):
+def test_validate_multi_accepts_legacy_env_less_prefix(tmp_path):
     root = _infra(tmp_path)
+    # multi-project tolerates the legacy env-less prefix (a safe manual override —
+    # each env has its own bucket). This mirrors this repo's deployed webapp configs.
     _backend(root, "webapp", "dev", "bkt-dev", "terraform/state/webapp")
+    cmd_validate(Namespace(infra_root=str(root)))  # no SystemExit => valid
+
+
+def test_validate_multi_accepts_env_baked_prefix(tmp_path):
+    root = _infra(tmp_path)
+    # ...and equally accepts the canonical env-baked prefix that `tfs create` now emits
+    _backend(root, "webapp", "dev", "bkt-dev", "terraform/state/dev/webapp")
     cmd_validate(Namespace(infra_root=str(root)))  # no SystemExit => valid
 
 

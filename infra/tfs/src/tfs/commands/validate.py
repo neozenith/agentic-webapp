@@ -9,7 +9,7 @@ import sys
 from argparse import Namespace
 
 from tfs.backends import find_backend_config, parse_backend_config
-from tfs.config import VALID_ENVS, bucket_for, expected_prefix, layout_of, load_config, validate_config_shape
+from tfs.config import VALID_ENVS, acceptable_prefixes, bucket_for, layout_of, load_config, validate_config_shape
 from tfs.roots import find_infra_root
 
 log = logging.getLogger(__name__)
@@ -40,9 +40,9 @@ def cmd_validate(args: Namespace) -> None:
         if parsed.get("bucket") != want_bucket:
             results[str(rel)].append(f"bucket = '{parsed.get('bucket')}', expected '{want_bucket}'")
 
-        want_prefix = expected_prefix(stack_name, env_config, layout=layout)
-        if parsed.get("prefix") != want_prefix:
-            results[str(rel)].append(f"prefix = '{parsed.get('prefix')}', expected '{want_prefix}'")
+        want_prefixes = acceptable_prefixes(stack_name, env_config, layout=layout)
+        if parsed.get("prefix") not in want_prefixes:
+            results[str(rel)].append(f"prefix = '{parsed.get('prefix')}', expected one of {want_prefixes}")
 
         if not results[str(rel)]:
             log.info("✅ %s is valid", rel)

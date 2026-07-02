@@ -57,7 +57,7 @@ def test_create_scaffolds_stack_and_workflow(tmp_path):
     for env in ("dev", "test", "prod"):
         cfg = (stack / "backends" / f"{env}.config").read_text()
         assert f'bucket = "bkt-{env}"' in cfg  # per-env state bucket
-        assert "terraform/state/monitoring" in cfg  # per-stack prefix (no env in prefix)
+        assert f"terraform/state/{env}/monitoring" in cfg  # env-baked prefix (canonical, both layouts)
     # workflow scaffolded under the resolved repo root (.github lands at infra root here)
     wf = list(root.rglob("terraform-cicd-stack-monitoring.yml"))
     assert wf, "per-stack CI workflow not scaffolded"

@@ -56,17 +56,24 @@ Two roots are discovered **independently** — the tool never assumes `infra/` a
 ## Project layouts (single- vs multi-project)
 
 `config.yml` declares a **required** `layout:` key that tells `tfs` how your GCP
-projects and tfstate are partitioned. It drives three things consistently — the
-project `check_project` guards, the state bucket, and the GCS prefix:
+projects and tfstate are partitioned. It drives the project `check_project` guards
+and the state bucket. The **state prefix is the same in both layouts** —
+`terraform/state/<env>/<stack>` — so the two collapse to one convention and only the
+project/bucket resolution differs:
 
-| `layout:` | GCP project | tfstate bucket | GCS prefix | `environments:` shape |
+| `layout:` | GCP project | tfstate bucket | GCS prefix (canonical) | `environments:` shape |
 |---|---|---|---|---|
-| `multi-project` (this repo) | one **per env** | one **per env** | `terraform/state/<stack>` | map `{env: {project_id, state_bucket}}` |
+| `multi-project` (this repo) | one **per env** | one **per env** | `terraform/state/<env>/<stack>` | map `{env: {project_id, state_bucket}}` |
 | `single-project` | one **shared** | one **shared** | `terraform/state/<env>/<stack>` | list `[dev, test, prod]` + top-level `project_id`/`state_bucket` |
 
-`tfs validate` checks each `backends/*.config` against the layout, and `tfs create`
-scaffolds new stacks with the matching bucket + prefix. A config whose shape doesn't
-match its declared `layout:` fails loudly (no silent mode inference).
+`tfs create` scaffolds new stacks with the env-baked prefix in both layouts. `tfs
+validate` checks each `backends/*.config` against it — with one deliberate tolerance:
+under **multi-project** it also accepts the legacy env-less prefix
+`terraform/state/<stack>` (a safe manual override, since each env already has its own
+bucket — this is what this repo's deployed `webapp` stack uses). Under
+**single-project** the env-less form is rejected: all envs share one bucket, so an
+env-less prefix would collide dev/test/prod state. A config whose shape doesn't match
+its declared `layout:` fails loudly (no silent mode inference).
 
 ```yaml
 # multi-project (this repo)

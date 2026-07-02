@@ -7,18 +7,18 @@ never a silent guess):
 
   layout: multi-project   # one GCP project + tfstate bucket PER environment.
       environments is a MAP {env: {project_id, state_bucket}}. State is isolated by
-      living in a different project/bucket per env, so the prefix is per-stack only:
-      terraform/state/<stack>.
+      living in a different project/bucket per env.
 
   layout: single-project  # ONE GCP project + ONE tfstate bucket for every env.
       environments is a LIST [dev, test, prod] and project_id/state_bucket sit at
-      the top level. dev/test/prod are partitioned by the GCS PREFIX instead:
-      terraform/state/<env>/<stack>.
+      the top level. dev/test/prod are partitioned by the GCS PREFIX instead.
 
-The layout drives three things — the GCP project checked (gcp.check_project), the
-state bucket, and the prefix — so all three stay consistent. Consumers ask this
-module (project_for/bucket_for/expected_prefix); they never branch on layout
-themselves."""
+The canonical state prefix is the SAME in both layouts — terraform/state/<env>/<stack>
+(env-baked) — so the two collapse to one convention; the layout only changes which
+GCP project and tfstate bucket an env resolves to. (multi-project additionally
+tolerates the legacy env-less prefix as a manual override — see acceptable_prefixes.)
+Consumers ask this module (project_for/bucket_for/expected_prefix); they never branch
+on layout themselves."""
 
 import logging
 from pathlib import Path
@@ -108,14 +108,28 @@ def bucket_for(config: dict[str, Any], environment: str) -> str:
     return str(config["environments"][environment]["state_bucket"])
 
 
-def expected_prefix(stack_name: str, environment: str, *, layout: str) -> str:
-    """The GCS backend prefix a stack's state MUST live under. In single-project the
-    environment is part of the prefix (that is what partitions dev/test/prod within
-    the one shared bucket); in multi-project each env has its own bucket, so the
-    prefix is per-stack only."""
-    if layout == SINGLE_PROJECT:
-        return f"terraform/state/{environment}/{stack_name}"
-    return f"terraform/state/{stack_name}"
+def expected_prefix(stack_name: str, environment: str) -> str:
+    """The canonical GCS backend prefix a stack's state lives under — env-baked in
+    BOTH layouts (terraform/state/<env>/<stack>). Required in single-project (all
+    envs share one bucket, so the env must partition the prefix) and uniform-though-
+    redundant in multi-project (each env already has its own bucket). `tfs create`
+    scaffolds this for every new stack, so the two layouts collapse to one prefix
+    convention. Pre-existing hand-materialised prefixes are honoured — see
+    acceptable_prefixes."""
+    return f"terraform/state/{environment}/{stack_name}"
+
+
+def acceptable_prefixes(stack_name: str, environment: str, *, layout: str) -> list[str]:
+    """The prefixes `tfs validate` accepts for a stack/env: the canonical env-baked
+    form always, plus — in multi-project ONLY — the legacy per-stack form
+    (terraform/state/<stack>). That legacy form is a safe manual override under
+    multi-project because each env's own bucket already isolates the state; under
+    single-project it is NOT accepted, since all envs share one bucket and an
+    env-less prefix would collide dev/test/prod state at the same path."""
+    prefixes = [expected_prefix(stack_name, environment)]
+    if layout == MULTI_PROJECT:
+        prefixes.append(f"terraform/state/{stack_name}")
+    return prefixes
 
 
 def list_stacks(infra_root: Path) -> list[str]:
