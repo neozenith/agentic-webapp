@@ -14,7 +14,7 @@ from importlib.resources.abc import Traversable
 
 import jinja2
 
-from tfs.config import load_config
+from tfs.config import bucket_for, environments_of, expected_prefix, load_config, validate_config_shape
 from tfs.roots import find_infra_root, find_repo_root
 
 log = logging.getLogger(__name__)
@@ -55,14 +55,18 @@ def cmd_create(args: Namespace) -> None:
         log.info("    Copying template %s --> stacks/%s/%s", tf_file.name, stack_name, tf_file.name)
         target.write_text(tf_file.read_text())
 
-    # Template the per-env backend configs from config.yml
+    # Template the per-env backend configs from config.yml. The bucket + prefix are
+    # resolved layout-aware in Python (config.bucket_for / expected_prefix), so the
+    # template stays dumb and the state-layout convention lives in exactly one place.
     log.info("Creating backend configs for: %s", stack_name)
+    validate_config_shape(base_config)
     backend_template = (templates / "backends" / "base.config.j2").read_text()
-    for environment, env_config in base_config["environments"].items():
-        ctx = dict(env_config)
-        ctx["environment"] = environment
-        ctx["stack_name"] = stack_name
-        rendered = _render(backend_template, **ctx)
+    for environment in environments_of(base_config):
+        rendered = _render(
+            backend_template,
+            state_bucket=bucket_for(base_config, environment),
+            prefix=expected_prefix(stack_name, environment),
+        )
         out = target_backends_path / f"{environment}.config"
         log.info("    Writing stacks/%s/backends/%s.config", stack_name, environment)
         out.write_text(rendered)

@@ -1,21 +1,26 @@
 """GCP guardrail — proves the active gcloud credentials can see the target
 project before any state-touching terraform call.
 
-NOTE: the project naming convention (dbt-<env>-jaffleshop) is intentionally the
-same as the sibling dbt repo — this repo reuses those exact projects."""
+The project to check is resolved from config.yml via config.project_for, so the
+guardrail is correct in BOTH layouts: single-project checks the one shared project
+for every env; multi-project checks the env's own project (e.g. dbt-<env>-jaffleshop
+in this repo, which deliberately reuses the sibling dbt projects)."""
 
 import logging
 import subprocess
+from pathlib import Path
 
+from tfs.config import load_config, project_for
 from tfs.errors import TFStackGCPConfigurationError
 
 log = logging.getLogger(__name__)
 
 
-def check_project(environment: str) -> None:
-    """Prove you're authenticated against dbt-<env>-jaffleshop. Hard failure (no
-    silent skip): if gcloud can't describe the project, stop."""
-    project_id = f"dbt-{environment}-jaffleshop"
+def check_project(environment: str, infra_root: Path) -> None:
+    """Prove you're authenticated against the env's GCP project (resolved from
+    config.yml + its layout). Hard failure (no silent skip): if gcloud can't
+    describe the project, stop."""
+    project_id = project_for(load_config(infra_root), environment)
     try:
         result = subprocess.run(
             ["gcloud", "projects", "describe", project_id, "--format=value(projectId)"],
